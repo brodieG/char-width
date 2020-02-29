@@ -1,0 +1,173 @@
+# Notes on Updating R Char Width Calculations
+
+## ICU
+
+External library that is optionally linked (?) to R.  More details in
+`?icuSetCollate`.  Gábor was curious if we could use functions therein for width
+calculations.  Given:
+
+> Optionally, R can be built to collate character strings by ICU
+> (http://site.icu-project.org). For such systems, icuSetCollate can be used to
+> tune the way collation is done. On other builds calling this function does
+> nothing, with a warning. 
+
+Sounds like ICU is used by default except on windows.
+
+> ICU is used by default wherever it is available: this include macOS, Solaris
+> and many Linux installations. As it works internally in UTF-8, it will be most
+> efficient in UTF-8 locales.
+
+It appears ICU is only used for locale
+
+
+## Width Calculations
+
+### Overview
+
+Actual width calculations are done by `R_nchar` in "src/main/character.c".
+There are three pathways to the "Width" calculation:
+
+1. String is UTF-8
+2. else we are in a `mbslocale`
+3. else `strlen(translateChar(string))`
+
+For the first two the general logic seems to be to convert to UCS (a.k.a.
+unicode for all intents and purposes) and store that as an `Rwchar_t` to look up
+in the `table_wcwidth` table.  `Rwchar_t` is a wrapper for `wchar_t` that
+switches to `int` in windows that still uses the 16-bit LE encoding.  It is
+unclear whether R actually checks the size of `wchar_t` as per wikipedia it may
+be insufficient not just on windows:
+
+> The width of wchar_t is compiler-specific and can be as small as 8 bits.
+> Consequently, programs that need to be portable across any C or C++ compiler
+> should not use wchar_t for storing Unicode text. The wchar_t type is intended
+> for storing compiler-defined wide characters, which may be Unicode characters
+> in some compilers.
+
+The last one just seems to be the byte length of the string the current locale,
+which presumably is not a multi-byte locale so is just the number of characters
+in the string.
+
+In order to add the multi code point characters we'll need to update
+`Ri18n_wcswidth` to account for it, and switch the UTF-8 loop to use that as
+currently the UTF-8 loop just computes the width one-by-one.  It may be possible
+to use an ICU function to do this.
+
+More details follow.
+
+### UTF-8 Width
+
+```{c}
+wchar_t wc1;
+Rwchar_t ucs;
+int nc = 0;
+// Advance by the computed utf8 width
+// utf8clen uses a lookup table to compute
+// width, allows >4, but validity is 
+// checked first
+for( ; *p; p += utf8clen(*p)) {
+    // Convert to Unicode Code Point, high
+    // surrogate business is for sizeof(wchar_t)
+    // == 16 as in Windoze.  See main/utils.c
+    utf8toucs(&wc1, p);
+    if (IS_HIGH_SURROGATE(wc1))
+        ucs = utf8toucs32(wc1, p);
+    else
+        ucs = wc1;
+    // Actually compute width
+    // See main/rlocale.c
+    nc += Ri18n_wcwidth(ucs);
+}
+return nc;
+```
+
+NOTE: UCS is Universal Coded Character Set, which is supposed to be:
+
+> This ISO/IEC 10646 standard is maintained in conjunction with The Unicode
+> Standard ("Unicode"), and they are code-for-code identical.
+
+Here is the width from "main/rlocale.c".  Changing logic to allow multi-element
+emoji will require a bit of surgery, probably to `R_nchar`.
+
+Question: what is the i18 business (appears related to ICU).
+
+```
+int Ri18n_wcwidth(Rwchar_t c)
+{
+    char lc_str[128];
+    unsigned int i, j;
+
+    static char *lc_cache = "";
+    static int lc = 0;
+
+    if (0 != strcmp(setlocale(LC_CTYPE, NULL), lc_cache)) {
+      // ... set locale if not set ...
+      // Importantly generates the `lc` offset for the lookup table column,
+      // based on comments in rlocale.h this is important b/c some locales have
+      // different conceptions of character width, paricularly in East-Asian
+      // ambiguous category.
+    }
+    // Attempt to lookup in table_wcwidth in main/rlocal_data.h,
+    // a `static const struct interval_wcwidth` that contains:
+    // where CP is unicode code point in hex:
+    // {
+    //   {start CP, end CP, per_locale_widths[7]},
+    //   {... repeat above for each range}
+    // }
+    // wcwidthsearch does a binary search in the presumably sorted
+    // table_wcwidth.
+
+    int wd = wcwidthsearch(c, table_wcwidth,
+			   (sizeof(table_wcwidth)/sizeof(struct interval_wcwidth)),
+			   lc);
+
+    if (wd >= 0) return wd; // currently all are 1 or 2.
+
+    // Search for zero width characters
+
+    int zw = wcsearch(c, zero_width, zero_width_count);
+    return zw ? 0 : 1; // assume unknown chars are width one.
+}
+```
+
+We need to better understand the locale width exceptions in EA ambiguous, and
+under what circumstances the `lc` value / how it is changed.  Maybe we can just
+compute the table and not worry about it.
+
+### MBCS locale width
+
+Still all from "main/character.c:R_nchar":
+
+```{c}
+// Convert to native encoding, presumably so we can use mbstowcs, which
+// is a C99 function?  mbstowcs also returns how many wide chars there
+// are, so the first use is just for size
+
+const char *xi = translateChar(string);
+int nc = (int) mbstowcs(NULL, xi, 0);
+if (nc >= 0) {
+    const void *vmax = vmaxget();
+    wchar_t *wc = (wchar_t *)
+        R_AllocStringBuffer((nc+1)*sizeof(wchar_t), &cbuff);
+
+    // Now convert into our buffer.  Note for windows
+    // R defines Rmbstowcs in gnuwin32/extra.c
+
+    mbstowcs(wc, xi, nc + 1);
+
+    // Compute width as before
+
+    int nci18n = Ri18n_wcswidth(wc, 2147483647);
+    vmaxset(vmax);
+    return (nci18n < 1) ? nc : nci18n;
+} else if (allowNA)
+    error(_("invalid multibyte string, %s"), msg_name);
+else
+    return NA_INTEGER;
+```
+
+## Locale Specific Widths
+
+As noted earlier there are a bunch of characters that R designates as East Asian
+Ambiguous that have different widths in different locales.
+
