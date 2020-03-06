@@ -112,19 +112,34 @@ with(rdat,
 )
 # - Map R Entries to Unicode ---------------------------------------------------
 
-# Generate a mapping of R's entries to unicode entries
+# Generate a mapping of R's entries to unicode entries; need to
+# handle fact there are duplicate R entries due to windows
 
 allpoints <- seq(0L, max(c(udat[['end']], rdat[['end']])))
-map <- data.frame(id=allpoints)
-map <- within(map, {
-  id <- as.hexmode(id)
-  rid <- findInterval(id, rdat$start)
-  rid[rid != findInterval(id, rdat$end + 1) + 1] <- -1L
-  uid <- findInterval(id, udat$start)
-  uid[uid != findInterval(id, udat$end + 1) + 1] <- -1L
-  urid <- cumsum(c(0, (diff(uid) != 0) | (diff(rid) != 0)))
-})
-stopifnot(with(map, !any(is.na(uid) & !is.na(rid))))
+rsizes <- with(rdat, end - start + 1L)
+rallp <- with(
+  rdat,
+  data.frame(
+    id=rep(start - 1L, rsizes) + sequence(rsizes),
+    rid=rep(seq_len(nrow(rdat)), rsizes)
+) )
+usizes <- with(udat, end - start + 1L)
+uallp <- with(
+  udat,
+  data.frame(
+    id=rep(start - 1L, usizes) + sequence(usizes),
+    uid=rep(seq_len(nrow(udat)), usizes)
+) )
+map <- merge(rallp, uallp, by='id', all=TRUE)
+with(
+  map, stopifnot(
+    !anyNA(uid),
+    all(uallp[['uid']] %in% uid),
+    all(rallp[['rid']] %in% rid[!is.na(rid)]),
+    !is.unsorted(id)
+) )
+map <- transform(map, rid=ifelse(is.na(rid), -1L, rid))
+map <- transform(map, urid=cumsum(c(0L, (diff(uid) != 0) | (diff(rid) != 0))))
 
 # Collapse back to ranges for each uid/rid interaction, ignoring stuff less than
 # 0xa1 as R doesn't seem to care about that, and also get rid of all the -1
@@ -208,7 +223,8 @@ map.t <- within(map.t,{
 
 f <- function(x) length(x) > 1 && sum(nzchar(x)) < 2
 collapse <- with(map.t, tapply(comment, group, f))
-map.tc <- subset(map.t, group %in% as.integer(names(which(collapse))))
+group.multi <- as.integer(names(which(collapse)))
+map.tc <- subset(map.t, group %in% group.multi)
 
 # Collapse the groups
 
@@ -217,9 +233,36 @@ map.tc.id <- matrix(cumsum(rbind(1, map.tc.rle$lengths - 1)), 2)
 map.tcc <- map.tc[map.tc.id[1,],]
 map.tcc[,'end'] <- map.tc[map.tc.id[2,],'end']
 
-# Recombine with the un-grouped elements
+# Need comment, get it by putting longest comment first in
+# each group (only one comment in this whole block?? - is that right)
 
+map.com <- with(map.tc, comment[order(group, -nchar(comment))])
+map.tcc['comment'] <- map.com[map.tc.id[1,]]
 
+# Recombine with the single row groups
+
+map.fin <- rbind(
+  subset(map.t, !group %in% group.multi),
+  map.tcc
+)
+map.fin <- map.fin[order(map.fin[['start']]),]
+with(map.fin, stopifnot(all(start[-1] > end[-length(end)])))
+map.fin[c('start', 'end')] <- lapply(map.fin[c('start', 'end')], as.hexmode)
+map.fin[['id']] <- seq_len(nrow(map.fin))
+
+# Map back to position in originial rlocale table; new rows will go
+# immediately behind the closest rlocale row
+
+map.fin[['rid2']] <- cummax(map.fin[['rid']])
+
+# Need a target vector that has:
+# * text
+# * original position
+# * new position
+#
+# So need to generate a text vector that can hold all the original entries
+# plus the new ones.  Maybe repeat the old ones that now have groups?  What
+# about collapsing?
 
 # STILL NEED TO GET COMMENT
 

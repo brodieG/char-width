@@ -1,5 +1,119 @@
 # Notes on Updating R Char Width Calculations
 
+## Unicode
+
+### Width Designations
+
+From: https://www.unicode.org/reports/tr11/tr11-31.html
+
+* F: East Asian Fullwidth: have a compatibility decomposition of type <wide>
+  (WTF?) for characters that are otherwise implicitly narrow.
+* H: East Asian Halfwidth: have a compatibility decomposition of type <narrow>,
+  and the WON SIGN for characters that are otherwise implicitly wide..
+* W: East Asian Wide: All other character that are always wide.
+* Na: East Asian Narrow: All other characters that are always narrow
+* A: Ambiguous: characters that might be narrow or wide and require additional
+  information (e.g. Locale, as shown by `table_wcwidth`).
+* N: Neutral, behave as narrow (not East Asian), although it seems that some of
+  the so-labeled Neutral characters are actually better thought of as zero
+  width, e.g. the 200B..200F range:
+
+```
+200B..200F;N     # Cf     [5] ZERO WIDTH SPACE..RIGHT-TO-LEFT MARK
+```
+This is discussed in tr11 section 6.2:
+
+> In particular, nonspacing marks do not possess actual advance width.
+> Therefore, even when displaying combining marks, the East_Asian_Width property
+> cannot be related to the advance width of these characters.
+
+The "decomposition type" thing is weird.  It seems to suggest that when
+decomposed for compatibility, wide points to normally narrow characters to
+display as wide (and vice versa).  No idea what this means.
+
+> In a broad sense, wide characters include W, F, and A (when in East Asian
+> context), and narrow characters include N, Na, H, and A (when not in East
+> Asian context).
+
+Note that 'A' characters are narrow in non-East-Asian contexts.
+
+Recommendations:
+
+> * Wide characters behave like ideographs in important ways, such as layout.
+>   Except for certain punctuation characters, they are not rotated when
+>   appearing in vertical text runs. In fixed-pitch fonts, they take up one Em
+>   of space.
+> * Halfwidth characters behave like ideographs in some ways,
+>   however, they are rotated like narrow characters when appearing in vertical
+>   text runs. In fixed-pitch fonts, they take up 1/2 Em of space.
+> * Narrow characters behave like Western characters, for example, in line
+>   breaking. They are rotated sideways, when appearing in vertical text. In
+>   fixed-pitch East Asian fonts, they take up 1/2 Em of space, but in
+>   rendering, a non-East Asian, proportional font is often substituted.
+> * Ambiguous characters behave like wide or narrow characters depending on the
+>   context (language tag, script identification, associated font, source of
+>   data, or explicit markup; all can provide the context). If the context
+>   cannot be established reliably, they should be treated as narrow characters
+>   by default [OPPOSITE OF UTF8].
+> * Emoji style standardized variation sequences behave as though they were East
+>   Asian Wide, regardless of their assigned East_Asian_Width property value.
+
+What about Zero Width?  They don't appear specifically in the table, and many of
+the known zero width controls are just "N".
+
+> All private-use characters are by default classified as Ambiguous, because
+> their definition depends on context.
+
+> Unassigned code points in ranges intended for CJK ideographs are classified as
+> Wide. Those ranges are: [NOTE: THIS ARE IN THE TABLES, AT LEAST SOME OF THEM]
+>
+> * the CJK Unified Ideographs block, 4E00..9FFF
+> * the CJK Unified Ideographs Externsion A block, 3400..4DBF
+> * the CJK Compatibility Ideographs block, F900..FAFF
+> * the Supplementary Ideographic Plane, 20000..2FFFF
+> * the Tertiary Ideographic Plane, 30000..3FFFF
+>
+> All other unassigned code points are by default classified as Neutral.
+
+One interesting implication of all this is what the width for code points 1FA96
+and greater but less that 20000 is not specified in 12.1?
+
+As noted earlier there are a bunch of characters that R designates as East Asian
+Ambiguous that have different widths in different locales.
+
+There is additional complexity with emoji.  `ut8` will treat all emoji as being
+wide, but at least based on my terminal it should be the `emoji_presentation`
+emojis that show up as wide.  For example Sun:
+
+```{r}
+writeLines(c('\u260034\n1234'))
+writeLines(c('\u2600\uFE0F34\n1234'))  # force emoji presentation
+```
+
+Should be treated as narrow, whereas sparkles as wide:
+
+```{r}
+writeLines(c('\u272834\n1234'))
+```
+
+Yet `utf8` treats both as wide:
+
+```{r}
+utf8::utf8_width(c('\u2600', '\u2728'))
+```
+```
+[1] 2 2
+```
+
+The East Asian Text actually reports this sensibly, Neutral for Sun and Wide for
+sparkles.  It's a bit complicated b/c it seems browsers aren't always consistent
+with monospace font on the display width of the glyphs.  In Rstudio 
+the non-emoji sun glyph is a little wider than 1, and the emoji one is exactly
+two.  In firefox neither is width two.
+
+So for a half-assed attempt at updating R we could go with the table
+designation.
+
 ## ICU
 
 External library that is optionally linked (?) to R.  More details in
@@ -9,7 +123,7 @@ calculations.  Given:
 > Optionally, R can be built to collate character strings by ICU
 > (http://site.icu-project.org). For such systems, icuSetCollate can be used to
 > tune the way collation is done. On other builds calling this function does
-> nothing, with a warning. 
+> nothing, with a warning.
 
 Sounds like ICU is used by default except on windows.
 
@@ -17,8 +131,18 @@ Sounds like ICU is used by default except on windows.
 > and many Linux installations. As it works internally in UTF-8, it will be most
 > efficient in UTF-8 locales.
 
-It appears ICU is only used for locale
+It appears ICU is only used for locale.
 
+TODO: find out if there are appropriate entry points to replace `Ri18n_wcswidth`
+
+Probably we want `BreakIterator` as it "count graphemes (or characters)", or
+maybe `CharacterIterator`, but both of these are probably C++?  Actually
+this stuff is supposedly available in `utf.h`.  `BreakIterator` seems to be
+where it's at, although we still need to figure the overall width of the
+grapheme, probably from the EAW of the first element combined with the other
+character attributes?  So we need to track down the function that provides the 
+character attributes in addition the EAW (i.e. 'emoji_presentation' chars are
+wide, even if not so EAW, also wide if made emoji presentation bu uFE0F).
 
 ## Width Calculations
 
@@ -63,7 +187,7 @@ Rwchar_t ucs;
 int nc = 0;
 // Advance by the computed utf8 width
 // utf8clen uses a lookup table to compute
-// width, allows >4, but validity is 
+// width, allows >4, but validity is
 // checked first
 for( ; *p; p += utf8clen(*p)) {
     // Convert to Unicode Code Point, high
@@ -165,9 +289,4 @@ if (nc >= 0) {
 else
     return NA_INTEGER;
 ```
-
-## Locale Specific Widths
-
-As noted earlier there are a bunch of characters that R designates as East Asian
-Ambiguous that have different widths in different locales.
 
