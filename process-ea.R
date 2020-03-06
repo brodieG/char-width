@@ -139,6 +139,9 @@ with(
     !is.unsorted(id)
 ) )
 map <- transform(map, rid=ifelse(is.na(rid), -1L, rid))
+
+# urid is effectively the interaction of the uid and rid
+
 map <- transform(map, urid=cumsum(c(0L, (diff(uid) != 0) | (diff(rid) != 0))))
 
 # Collapse back to ranges for each uid/rid interaction, ignoring stuff less than
@@ -151,7 +154,7 @@ map.c <- as.data.frame(
   t(
     vapply(
     map.s,
-    function(x) c(range(x[[1]]), x[[3L]][1L], x[[4L]][1L]),
+    function(x) c(range(x[[1]]), x[['uid']][1L], x[['rid']][1L]),
     integer(4)
 ) ) )
 names(map.c) <- c('start', 'end', 'uid', 'rid')
@@ -197,13 +200,19 @@ map.c[rid.val, 'rid_raw'] <- rdat[map.c[['rid']][rid.val], 'rid_raw']
 map.t <- with(map.c,
   data.frame(
     start=c(start), end=c(end),
-    uid, rid,
+    uid,
+    rid=ifelse(rid < 0, cummax(rid), rid),  # give a proxy id to new elements
     widths=sprintf(
       ',{%s}', do.call(paste, c(unname(map.c[wcols]), list(sep=',')))
     ),
     comment=ifelse(is.na(comment), "", comment),
     rid_raw=ifelse(is.na(rid_raw), -1L, rid_raw)
 ) )
+# recally there are possible duplicate ranges, ordering them by
+# rid puts the duplicate entries together for re-collapse.
+
+map.t <- map.t[with(map.t, order(rid, start, end)),]
+
 # Assign group ids
 
 map.t <- within(map.t,{
@@ -216,12 +225,12 @@ map.t <- within(map.t,{
   b2[which(diff(b1) == -1) + 1] <- TRUE
   b2[which(diff(b1) == +1) + 1] <- FALSE
   group <- cumsum(b2)
-  rm(se,we,re,b1,b2)
+  # rm(se,we,re,b1,b2)
 })
 # Check that in groups there is at most one distinct non-na, non empty
 # comment, and the group has multiple rows
 
-f <- function(x) length(x) > 1 && sum(nzchar(x)) < 2
+f <- function(x) length(x) > 1 && length(unique(x[nzchar(x) > 0])) < 2
 collapse <- with(map.t, tapply(comment, group, f))
 group.multi <- as.integer(names(which(collapse)))
 map.tc <- subset(map.t, group %in% group.multi)
@@ -246,7 +255,10 @@ map.fin <- rbind(
   map.tcc
 )
 map.fin <- map.fin[order(map.fin[['start']]),]
-with(map.fin, stopifnot(all(start[-1] > end[-length(end)])))
+with(
+  unique(map.fin[c('start', 'end')]),
+  stopifnot(all(start[-1] > end[-length(end)]))
+)
 map.fin[c('start', 'end')] <- lapply(map.fin[c('start', 'end')], as.hexmode)
 map.fin[['id']] <- seq_len(nrow(map.fin))
 
@@ -264,6 +276,5 @@ map.fin[['rid2']] <- cummax(map.fin[['rid']])
 # plus the new ones.  Maybe repeat the old ones that now have groups?  What
 # about collapsing?
 
-# STILL NEED TO GET COMMENT
 
 # Need output with as many rows as map.t + all the ifdef and comment rows
