@@ -69,15 +69,25 @@ lwinelse <- grep(pwinelse, txt1)
 lwinend <- grep(pwinend, txt1)
 lcomm <- grep(pcomm, txt1)
 
-# We should have matched every line in the table with these patterns
+# We should have matched every line in the table with these patterns,
+# and ifdefs els should all be one apart from each other, all should
+# be if/else/end, and none should be contiguous.  This allows us to
+# make helpful assumptions later, such as we can't be adding a new
+# unicode point inside an ifdef block.
 
 stopifnot(
   all.equal(
     sort(c(lbase, lwin, lwinelse, lwinend, lcomm)),
     seq(1L, rlend - rlstr - 5, by=1)
   ),
-  txt1[rlend - rlstr - 4] == "};"
+  txt1[rlend - rlstr - 4] == "};",
+  length(lwin) == length(lwinelse),
+  length(lwin) == length(lwinend),
+  all((lwinelse - lwin) == 2L),
+  all((lwinend - lwinelse) == 2L)
 )
+isifdef <- rep(0:4, length(lwin)) + rep(lwin, each=5)
+
 # Extract data into columns, we'll have duplicate ranges because
 # of the ifdefs; that should be fine.
 
@@ -186,6 +196,12 @@ map.c[rid.val, 'X1'] <- map.c[rid.val, 'W']
 map.c[rid.val, 'comment'] <- rdat[map.c[['rid']][rid.val], 'comment']
 map.c[rid.val, 'rid_raw'] <- rdat[map.c[['rid']][rid.val], 'rid_raw']
 
+# Drop all new uid mappings that have width == 1
+# as that is the unspecified width
+
+# map.c <- map.c[rid.val | map.c[['W']] != 1L,]
+rm(rid.val)  # not valid anymore
+
 # - Recreate Text Entries ------------------------------------------------------
 
 # Collapse sequential entries that are otherwise identical
@@ -197,19 +213,45 @@ map.c[rid.val, 'rid_raw'] <- rdat[map.c[['rid']][rid.val], 'rid_raw']
 # * No if/def (can test sequential rid_raw for this)
 # * Only one distinct comment per group
 
+rid.max <- max(rallp[['rid']])
 map.t <- with(map.c,
   data.frame(
     start=c(start), end=c(end),
-    uid,
-    rid=ifelse(rid < 0, cummax(rid), rid),  # give a proxy id to new elements
+    uid, rid,
     widths=sprintf(
       ',{%s}', do.call(paste, c(unname(map.c[wcols]), list(sep=',')))
     ),
     comment=ifelse(is.na(comment), "", comment),
     rid_raw=ifelse(is.na(rid_raw), -1L, rid_raw)
 ) )
-# recally there are possible duplicate ranges, ordering them by
-# rid puts the duplicate entries together for re-collapse.
+map.t[c('start', 'end')] <- lapply(map.t[c('start', 'end')], as.hexmode)
+# Generate proxy ids for the new rids.  We'll use the prior
+# rid if there is one and it isn't part of an ifdef, or the
+# next one if not.
+
+ridmap <- subset(map.t[c('rid', 'rid_raw')], rid >= 0)
+ridnew <- map.t[['rid']] < 0
+ridtmp <- ifelse(ridnew, cummax(map.t[['rid']]), map.t[['rid']])
+
+# check which are mapped to an ifdef block, for those, map to the
+# next rid until we're definitely not in an ifdef block.  This means
+# some rows will end up out of order, we'll need to reorder later
+
+k <- 1
+repeat {
+  if((k <- k + 1) > 10) stop("too many adjacent ifdefs")
+  newmap <- match(ridtmp[ridnew], ridmap[['rid']])
+  hitifdef <- which(ridmap[['rid_raw']][newmap] %in% isifdef)
+  if(!length(hitifdef)) break
+  hitifdeftmp <- (ridtmp %in% ridmap[['rid']][newmap][hitifdef]) & ridnew
+  ridtmp[hitifdeftmp] <- ridtmp[hitifdeftmp] + 1L
+}
+stopifnot(all(ridtmp <= rid.max))
+map.t[['rid']] <- ridtmp
+
+# recall there are possible duplicate ranges from ifdefs,
+# ordering them by rid puts the duplicate entries together
+# for re-collapse.
 
 map.t <- map.t[with(map.t, order(rid, start, end)),]
 
@@ -219,7 +261,12 @@ map.t <- within(map.t,{
   se <-c(start[-1] - end[-length(end)] == 1, FALSE)
   we <-c(widths[-1] == widths[-length(widths)], FALSE)
   re <-c(diff(rid_raw) == 1L | diff(rid_raw) == 0L, FALSE)
-  b1 <- b2 <- !(se & we & re)
+  # new comment starts group
+  cm <-c(
+    (comment[-1] == comment[-length(comment)]) | !nzchar(comment[-1]),
+    FALSE
+  )
+  b1 <- b2 <- !(se & we & re & cm)
   # groups start and end one later than the switch in values
   # is reported in (because we use cumsum below)
   b2[which(diff(b1) == -1) + 1] <- TRUE
@@ -227,10 +274,7 @@ map.t <- within(map.t,{
   group <- cumsum(b2)
   # rm(se,we,re,b1,b2)
 })
-# Check that in groups there is at most one distinct non-na, non empty
-# comment, and the group has multiple rows
-
-f <- function(x) length(x) > 1 && length(unique(x[nzchar(x) > 0])) < 2
+f <- function(x) length(x) > 1
 collapse <- with(map.t, tapply(comment, group, f))
 group.multi <- as.integer(names(which(collapse)))
 map.tc <- subset(map.t, group %in% group.multi)
@@ -248,18 +292,14 @@ map.tcc[,'end'] <- map.tc[map.tc.id[2,],'end']
 map.com <- with(map.tc, comment[order(group, -nchar(comment))])
 map.tcc['comment'] <- map.com[map.tc.id[1,]]
 
-# Recombine with the single row groups
+# Recombine with the single row groups, need to order by rid so
+# final order for ifdefs works
 
 map.fin <- rbind(
   subset(map.t, !group %in% group.multi),
   map.tcc
 )
-map.fin <- map.fin[order(map.fin[['start']]),]
-with(
-  unique(map.fin[c('start', 'end')]),
-  # this might not be strictly true due to the duplicate issue
-  stopifnot(all(start[-1] > end[-length(end)]))
-)
+map.fin <- map.fin[with(map.fin, order(rid, start)),]
 map.fin[c('start', 'end')] <- lapply(map.fin[c('start', 'end')], as.hexmode)
 map.fin[['id']] <- seq_len(nrow(map.fin))
 
@@ -301,6 +341,25 @@ regmatches(txt.raw, match.raw) <- fin.dat
 txtres <- rep(txt1, reps)
 txtresb <- rep(seq_along(txt1) %in% lbase, reps)
 txtres[txtresb] <- txt.raw
+
+# Get start point for each ifdef block for final re-order,
+# which will be the lowest start in block
+
+lnres <- rep(seq_along(txt1), reps)
+lnresifdef <- lnres %in% isifdef
+lnmax <- max(as.hexmode(map.fin[['end']]))
+lnstarts <- rep(lnmax + 1L, length(lnres))
+lnstarts[txtresb] <- as.hexmode(map.fin[['start']])
+
+lrdf.ids <- cumsum(lnres %in% lwin)
+lnres.grp <- ave(
+  lnstarts, as.integer(interaction(lrdf.ids, lnresifdef)), FUN=min
+)
+lnstarts[lnresifdef] <- lnres.grp[lnresifdef]
+lnstarts[lnstarts > lnmax] <- 0L
+lnstarts <- ifelse(lnstarts == 0L, cummax(lnstarts), lnstarts)
+
+txtres <- txtres[order(lnstarts)]
 
 # and into final file
 
