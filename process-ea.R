@@ -257,6 +257,7 @@ map.fin <- rbind(
 map.fin <- map.fin[order(map.fin[['start']]),]
 with(
   unique(map.fin[c('start', 'end')]),
+  # this might not be strictly true due to the duplicate issue
   stopifnot(all(start[-1] > end[-length(end)]))
 )
 map.fin[c('start', 'end')] <- lapply(map.fin[c('start', 'end')], as.hexmode)
@@ -265,7 +266,46 @@ map.fin[['id']] <- seq_len(nrow(map.fin))
 # Map back to position in originial rlocale table; new rows will go
 # immediately behind the closest rlocale row
 
-map.fin[['rid2']] <- cummax(map.fin[['rid']])
+ridt <- table(map.fin[['rid']])
+ridv <- as.integer(names(ridt))
+rid.count <- table(map.fin[['rid']])
+reps.raw <- integer(length(lbase))
+reps.id <- as.integer(names(rid.count))
+reps.raw[reps.id] <- rid.count
+reps <- rep(1L, length(txt1))
+reps[lbase] <- reps.raw
+
+# Generate the new text
+
+map.fin[map.fin[['rid_raw']] == -1L,'comment'] <- ' // unicode 12'
+map.fin[c('start', 'end')] <- lapply(
+  map.fin[c('start', 'end')], as.character, width=0
+)
+fin.mx <- do.call(rbind, map.fin[c('start', 'end', 'widths', 'comment')])
+fin.dat <- lapply(seq_len(ncol(fin.mx)), function(x) fin.mx[,x])
+
+txt.raw <- rep(txt2, reps.raw)
+matches.proc <- lapply(
+  matches, function(x) {
+    y <- x[-1]
+    attributes(y) <- attributes(x)
+    attr(y, 'match.length') <- attr(x, 'match.length')[-1]
+    y
+  }
+)
+match.raw <- rep(matches.proc, reps.raw)
+regmatches(txt.raw, match.raw) <- fin.dat
+
+# Insert back into ifdefs
+
+txtres <- rep(txt1, reps)
+txtresb <- rep(seq_along(txt1) %in% lbase, reps)
+txtres[txtresb] <- txt.raw
+
+# and into final file
+
+txtfin <- c(raw[seq_len(rlstr)], txtres, raw[-seq_len(rlend)])
+writeLines(txtfin, 'rlocale_data2.h')
 
 # Need a target vector that has:
 # * text
