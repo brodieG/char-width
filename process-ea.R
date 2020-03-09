@@ -1,3 +1,11 @@
+# This process attempts to reconcile the existing src/main/rlocale_data.h with
+# the Unicode EastAsianWidth Annex 11 file from
+# http://www.unicode.org/reports/tr11/
+#
+# The rlocale file contains addditional locale-specific width interpretations
+# that the unicode data does not have.  For this reason we never let the unicode
+# data override anything but the first column of the rlocale data.
+
 # - Parse Unicode EAW ----------------------------------------------------------
 
 # Read the EastAsianWidth.txt table into a data.frame (From Gábor),
@@ -26,6 +34,8 @@ udat <- within(udat, end[is.na(end)] <- start[is.na(end)])
 udat[c('start', 'end')] <- lapply(udat[c('start', 'end')], as.hexmode)
 
 # we rely on EastAsianWidth correctly representing emoji presentation
+# by marking the relevant code points as W or F (some emojis default to
+# emoji presentation, but others don't).
 
 eaw <- c(N=1L, Na=1L, W=2L, F=2L, H=1L, A=1L)
 
@@ -39,107 +49,121 @@ with(udat,
 )
 # We should probably collapse ranges that are contiguous and have the
 # same width property as we are not currently using any of the other
-# elements that cause ranges to be split.
+# properties that cause ranges to be split.
 
 # - Parse R EAW ----------------------------------------------------------------
 
 # Parse the R data that exists, look for `table_wcwidth` and the next table
 # after that, and process the data in between
 
-raw <- readLines('rlocale_data.h')
-rlstr <- grep('static +const +struct +interval_wcwidth +table_wcwidth\\[\\]', raw)
-rlend <- grep('static +const +struct +interval +table_walpha\\[\\]', raw)
-stopifnot(length(rlend) == 1, length(rlstr) == 1, rlstr + 1 < rlend)
-txt1 <- raw[(rlstr + 1):rlend]
+parse_rlocale <- function(rlocale) {
+  raw <- readLines(rlocale)
+  rlstr <- grep('static +const +struct +interval_wcwidth +table_wcwidth\\[\\]', raw)
+  rlend <- grep('static +const +struct +interval +table_walpha\\[\\]', raw)
+  stopifnot(length(rlend) == 1, length(rlstr) == 1, rlstr + 1 < rlend)
+  txt1 <- raw[(rlstr + 1):rlend]
 
-# Either we have a data row, or we have a conditional row, or a comment row
+  # Either we have a data row, or we have a conditional row, or a comment row
 
-pbase <- paste0(
-  "^\\s*\\{0x([0-9A-Fa-f]{2,6}),0x([0-9A-Fa-f]{2,6})(,\\{[012](?:,[012]){6}\\})\\},",
-  "(\\s*(?://.*|/\\*.*\\*/|))\\s*$"
-)
-pwin <- "^#ifdef\\s*Win32"
-pwinelse <- "^#else\\s*"
-pwinend <- "^#endif\\s*"
-pcomm <- "^\\s*//"
-
-lbase <- grep(pbase, txt1)
-lwin <- grep(pwin, txt1)
-lwinelse <- grep(pwinelse, txt1)
-lwinend <- grep(pwinend, txt1)
-lcomm <- grep(pcomm, txt1)
-
-# We should have matched every line in the table with these patterns,
-# and ifdefs els should all be one apart from each other, all should
-# be if/else/end, and none should be contiguous.  This allows us to
-# make helpful assumptions later, such as we can't be adding a new
-# unicode point inside an ifdef block.
-
-stopifnot(
-  all.equal(
-    sort(c(lbase, lwin, lwinelse, lwinend, lcomm)),
-    seq(1L, rlend - rlstr - 5, by=1)
-  ),
-  txt1[rlend - rlstr - 4] == "};",
-  length(lwin) == length(lwinelse),
-  length(lwin) == length(lwinend),
-  all((lwinelse - lwin) == 2L),
-  all((lwinend - lwinelse) == 2L)
-)
-isifdef <- rep(0:4, length(lwin)) + rep(lwin, each=5)
-
-# Extract data into columns, we'll have duplicate ranges because
-# of the ifdefs; that should be fine.
-
-txt2 <- txt1[lbase]
-matches <- regexec(pbase, txt2, perl=TRUE)
-txt3 <- regmatches(txt2, matches)
-
-stopifnot(all(lengths(txt3) == 5))
-
-rdat <- as.data.frame(t(matrix(unlist(txt3), 5)[2:5,]), stringsAsFactors=FALSE)
-names(rdat) <- c('start', 'end', 'widths', 'comment')
-
-wm <- gregexpr("[0-9]+", rdat$widths)
-wi <- regmatches(rdat$widths, wm)
-
-stopifnot(all(lengths(wi) == 7))
-wil <- data.frame(
-  matrix(unlist(wi), ncol=7, byrow=TRUE), stringsAsFactors=FALSE
-)
-rdat <- cbind(rdat, wil)
-rdat[c('start', 'end')] <- lapply(rdat[c('start', 'end')], as.hexmode)
-rdat[['rid_raw']] <- lbase
-
-with(rdat,
-  stopifnot(
-    all(start <= end),
-    # duplicates possible due of ifdefs producing different tables for
-    # Win32...
-    all(diff(as.integer(start)) >= 0),
-    all(diff(as.integer(end)) >= 0)
+  pbase <- paste0(
+    "^\\s*\\{0x([0-9A-Fa-f]{2,6}),0x([0-9A-Fa-f]{2,6})(,\\{[012](?:,[012]){6}\\})\\},",
+    "(\\s*(?://.*|/\\*.*\\*/|))\\s*$"
   )
-)
+  pwin <- "^#ifdef\\s*Win32"
+  pwinelse <- "^#else\\s*"
+  pwinend <- "^#endif\\s*"
+  pcomm <- "^\\s*//"
+
+  lbase <- grep(pbase, txt1)
+  lwin <- grep(pwin, txt1)
+  lwinelse <- grep(pwinelse, txt1)
+  lwinend <- grep(pwinend, txt1)
+  lcomm <- grep(pcomm, txt1)
+
+  # We should have matched every line in the table with these patterns,
+  # and ifdefs els should all be one apart from each other, all should
+  # be if/else/end, and none should be contiguous.  This allows us to
+  # make helpful assumptions later, such as we can't be adding a new
+  # unicode point inside an ifdef block.  If some of these assumptions
+  # change a lot of code will need to change.
+
+  stopifnot(
+    all.equal(
+      sort(c(lbase, lwin, lwinelse, lwinend, lcomm)),
+      seq(1L, rlend - rlstr - 5, by=1)
+    ),
+    txt1[rlend - rlstr - 4] == "};",
+    length(lwin) == length(lwinelse),
+    length(lwin) == length(lwinend),
+    all((lwinelse - lwin) == 2L),
+    all((lwinend - lwinelse) == 2L)
+  )
+  isifdef <- rep(0:4, length(lwin)) + rep(lwin, each=5)
+
+  # Extract data into columns, we'll have duplicate ranges because
+  # of the ifdefs; that should be fine.
+
+  txt2 <- txt1[lbase]
+  matches <- regexec(pbase, txt2, perl=TRUE)
+  txt3 <- regmatches(txt2, matches)
+
+  stopifnot(all(lengths(txt3) == 5))
+
+  rdat <- as.data.frame(t(matrix(unlist(txt3), 5)[2:5,]), stringsAsFactors=FALSE)
+  names(rdat) <- c('start', 'end', 'widths', 'comment')
+
+  wm <- gregexpr("[0-9]+", rdat$widths)
+  wi <- regmatches(rdat$widths, wm)
+
+  stopifnot(all(lengths(wi) == 7))
+  wil <- data.frame(
+    matrix(unlist(wi), ncol=7, byrow=TRUE), stringsAsFactors=FALSE
+  )
+  rdat <- cbind(rdat, wil)
+  rdat[c('start', 'end')] <- lapply(rdat[c('start', 'end')], as.hexmode)
+  rdat[['rid_raw']] <- lbase
+
+  with(rdat,
+    stopifnot(
+      all(start <= end),
+      # duplicates possible due of ifdefs producing different tables for
+      # Win32...
+      all(diff(as.integer(start)) >= 0),
+      all(diff(as.integer(end)) >= 0)
+    )
+  )
+  list(
+    lbase=lbase, lwin=lwin, txt1=txt1, isifdef=isifdef,
+    lwin=lwin, txt2=txt2, matches=matches, rdat=rdat,
+    rlstr=rlstr, rlend=rlend, raw=raw
+  )
+}
+ldat <- parse_rlocale('rlocale_data.h')
+
+# originally the stuff in ldat was generated in the script and
+# was available to rest of script, hence the horror below as
+# I don't want to go through and update all the code:
+
+list2env(ldat, environment())
+
 # - Map R Entries to Unicode ---------------------------------------------------
 
 # Generate a mapping of R's entries to unicode entries; need to
-# handle fact there are duplicate R entries due to windows
+# handle fact there are duplicate R entries due to ifdef statements
 
 allpoints <- seq(0L, max(c(udat[['end']], rdat[['end']])))
-rsizes <- with(rdat, end - start + 1L)
-rallp <- with(
-  rdat,
-  data.frame(
-    id=rep(start - 1L, rsizes) + sequence(rsizes),
-    rid=rep(seq_len(nrow(rdat)), rsizes)
-) )
-usizes <- with(udat, end - start + 1L)
-uallp <- with(
-  udat,
-  data.frame(
-    id=rep(start - 1L, usizes) + sequence(usizes),
-    uid=rep(seq_len(nrow(udat)), usizes)
-) )
+all_points <- function(dat, prefix) {
+  sizes <- with(dat, end - start + 1L)
+  allp <- with(
+    dat,
+    data.frame(
+      id=rep(start - 1L, sizes) + sequence(sizes),
+      id2=rep(seq_len(nrow(dat)), sizes)
+  ) )
+  setNames(allp, c('id', paste0(prefix, 'id')))
+}
+rallp <- all_points(rdat, 'r')
+uallp <- all_points(udat, 'u')
 map <- merge(rallp, uallp, by='id', all=TRUE)
 with(
   map, stopifnot(
@@ -188,7 +212,7 @@ map.c[['W']] <- eaw[map.c[['EAW']]]
 stopifnot(!anyNA(map.c[['EAW']]), !anyNA(map.c[['W']]))
 
 # If no rid, set all to new W value, otherwise update the first element
-# to the new value, and add auxillary daata
+# to the new value, and preserve the other locale-specific data
 
 map.c[!rid.val, wcols] <- map.c[!rid.val, 'W']
 map.c[rid.val, 'X1'] <- map.c[rid.val, 'W']
@@ -197,9 +221,10 @@ map.c[rid.val, 'comment'] <- rdat[map.c[['rid']][rid.val], 'comment']
 map.c[rid.val, 'rid_raw'] <- rdat[map.c[['rid']][rid.val], 'rid_raw']
 
 # Drop all new uid mappings that have width == 1
-# as that is the unspecified width
+# as that is the unspecified width (it may be useful for testing to leave
+# these in as they may reveal problems with the mapping code)
 
-# map.c <- map.c[rid.val | map.c[['W']] != 1L,]
+map.c <- map.c[rid.val | map.c[['W']] != 1L,]
 rm(rid.val)  # not valid anymore
 
 # - Recreate Text Entries ------------------------------------------------------
@@ -210,8 +235,8 @@ rm(rid.val)  # not valid anymore
 # there that end up being irrelevant for this table.
 #
 # * Every entry is the same
-# * No if/def (can test sequential rid_raw for this)
-# * Only one distinct comment per group
+# * if/def break ranges
+# * Only one distinct comment at top of group
 
 rid.max <- max(rallp[['rid']])
 map.t <- with(map.c,
@@ -304,7 +329,7 @@ map.fin[c('start', 'end')] <- lapply(map.fin[c('start', 'end')], as.hexmode)
 map.fin[['id']] <- seq_len(nrow(map.fin))
 
 # Map back to position in originial rlocale table; new rows will go
-# immediately behind the closest rlocale row
+# immediately behind the previous rlocale row
 
 ridt <- table(map.fin[['rid']])
 ridv <- as.integer(names(ridt))
@@ -336,14 +361,15 @@ matches.proc <- lapply(
 match.raw <- rep(matches.proc, reps.raw)
 regmatches(txt.raw, match.raw) <- fin.dat
 
-# Insert back into ifdefs
+# Interleave with non data rows (ifdefs/comments)
 
 txtres <- rep(txt1, reps)
 txtresb <- rep(seq_along(txt1) %in% lbase, reps)
 txtres[txtresb] <- txt.raw
 
-# Get start point for each ifdef block for final re-order,
-# which will be the lowest start in block
+# We will give each ifdef block as start point the lowest start
+# in the block.  This will allow us to reorder everything according
+# to start without mixing ifdef els with non-ifdef
 
 lnres <- rep(seq_along(txt1), reps)
 lnresifdef <- lnres %in% isifdef
@@ -366,14 +392,35 @@ txtres <- txtres[order(lnstarts)]
 txtfin <- c(raw[seq_len(rlstr)], txtres, raw[-seq_len(rlend)])
 writeLines(txtfin, 'rlocale_data2.h')
 
-# Need a target vector that has:
-# * text
-# * original position
-# * new position
-#
-# So need to generate a text vector that can hold all the original entries
-# plus the new ones.  Maybe repeat the old ones that now have groups?  What
-# about collapsing?
+# - Sanity Checks --------------------------------------------------------------
 
+# * Everything in order for each ifdef mode
+# * No codepoint that was specified in rdat missing
+# * The two ifdef modes are essentially the same
 
-# Need output with as many rows as map.t + all the ifdef and comment rows
+ldat2 <- parse_rlocale('rlocale_data2.h')
+rdat2 <- ldat2[['rdat']]
+# ifdef TRUE
+rdat2a <- subset(rdat2,
+  rid_raw %in% c(ldat2[['lwin']] + 1L) | (!rid_raw %in% ldat2[['isifdef']])
+)
+# ifdef FALSE
+rdat2b <- subset(rdat2,
+  rid_raw %in% c(ldat2[['lwin']] + 3L) | (!rid_raw %in% ldat2[['isifdef']])
+)
+
+with(rdat2a,
+  stopifnot(
+    all(start[-1] > start[-length(start)]),
+    all(end[-1] > end[-length(end)]),
+    all(start[-1L] > end[-length(end)])
+) )
+with(rdat2b,
+  stopifnot(
+    all(start[-1] > start[-length(start)]),
+    all(end[-1] > end[-length(end)]),
+    all(start[-1L] > end[-length(end)])
+) )
+rallp2a <- all_points(rdat2a, 'r')
+rallp2b <- all_points(rdat2b, 'r')
+
