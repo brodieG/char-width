@@ -73,7 +73,7 @@ the known zero width controls are just "N".
 > their definition depends on context.
 
 > Unassigned code points in ranges intended for CJK ideographs are classified as
-> Wide. Those ranges are: [NOTE: THIS ARE IN THE TABLES, AT LEAST SOME OF THEM]
+> Wide. Those ranges are: [NOTE: These seem to all be in the table]
 >
 > * the CJK Unified Ideographs block, 4E00..9FFF
 > * the CJK Unified Ideographs Externsion A block, 3400..4DBF
@@ -156,6 +156,14 @@ U+00AD is softhyphen, U+1160..11FF are Hangul Jongseong, U+200B is zero width
 space (but it's in Cf??).
 
 Rlocale adds \p{gc=Cc}.
+
+Some `Mc` things are showing up in the R version, and this is not a version
+change, seems like the R version just has it wrong?.
+
+```
+0D46;MALAYALAM VOWEL SIGN E;Mc;0;L;;;;;N;;;;;  # unicode 12
+0D46;MALAYALAM VOWEL SIGN E;Mc;0;L;;;;;N;;;;;  # unicode 8
+```
 
 ## ICU
 
