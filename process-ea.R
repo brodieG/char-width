@@ -423,4 +423,23 @@ with(rdat2b,
 ) )
 rallp2a <- all_points(rdat2a, 'r')
 rallp2b <- all_points(rdat2b, 'r')
+stopifnot(
+  identical(rallp2a$id, rallp2b$id),
+  all(rallp$id %in% rallp2a$id)
+)
+# Generate every code point from 0xa1 to 0x10fffd
+
+cps <- as.character(
+  parse(
+    text=paste0(
+      "c(",
+      paste0(
+        "'\\U", as.character(as.hexmode(0xa1:0x10ffd), width=8), "'",
+        collapse=",\n"
+      ),
+      ",NULL)"
+    ),
+    keep.source=FALSE
+  )[[1]][-1]
+)
 
