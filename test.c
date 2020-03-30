@@ -1,4 +1,4 @@
-#define _XOPEN_SOURCE  
+#define _XOPEN_SOURCE
 #include <wchar.h>
 #include <stdio.h>
 #include <locale.h>
@@ -12,10 +12,13 @@ int main() {
   printf("%s\n", setlocale(LC_CTYPE, "en_US.UTF-8"));
   FILE * f = fopen("glibc_widths", "w");
 
-  for(wchar_t i = 0; i < 0x3000; ++i) {
-    fprintf(f, "%04x %d\n", i, wcwidth(i));
+  for(wchar_t i = 0x1; i <= 0x10fffd; ++i) {
+  // for(wchar_t i = 20; i <= 0x7f; ++i) {
+    //fprintf(f, "%04x\t%d\n", i, wcwidth(i));
+    fprintf(f, "%d\n", wcwidth(i));
   }
   fclose(f);
 
   return 0;
 }
+// head -n 13000 glibc_widths | tail

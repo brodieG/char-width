@@ -427,14 +427,14 @@ stopifnot(
   identical(rallp2a$id, rallp2b$id),
   all(rallp$id %in% rallp2a$id)
 )
-# Generate every code point from 0xa1 to 0x10fffd
+# Generate every code point from 0x1 to 0x10fffd
 
-cps <- as.character(
+start <- as.character(
   parse(
     text=paste0(
       "c(",
       paste0(
-        "'\\U", as.character(as.hexmode(0xa1:0x10ffd), width=8), "'",
+        "'\\u", as.character(as.hexmode(1:0xa0)), "'",
         collapse=",\n"
       ),
       ",NULL)"
@@ -442,4 +442,45 @@ cps <- as.character(
     keep.source=FALSE
   )[[1]][-1]
 )
+start <- start[-length(start)]
+end <- as.character(
+  parse(
+    text=paste0(
+      "c(",
+      paste0(
+        "'\\U", as.character(as.hexmode(0xa1:0x10fffd), width=8), "'",
+        collapse=",\n"
+      ),
+      ",NULL)"
+    ),
+    keep.source=FALSE
+  )[[1]][-1]
+)
+end <- end[-length(end)]
+cps <- c(start, end)
 
+
+# - Comparisons ----------------------------------------------------------------
+#
+# Compare to other sources:
+#
+# * glibc 2.29 (Unicode 11?)
+# * utf8::utf8_width
+# * stri::stri_width
+# * R 3.6.3
+
+cpsa <- cps
+cpsa[0xd800:0xdFFF] <- ""  # surrogates that stringi doesn't like
+
+glibc <- readLines('glibc_widths')
+utf8 <- utf8::utf8_width(cps)
+stri <- stringi::stri_width(cpsa)
+r3.6 <- nchar(cps, type='width')
+r4.0 <- readRDS('r40widths.rds')
+
+dat <- data.frame(
+  cp=1:0x10fffd,
+  r3.6, r4.0, glibc, utf8, stri
+)
+dat[['cp']] <- as.hexmode(dat[['cp']])
+subset(dat, r3.6 != r4.0)[1:50,]
