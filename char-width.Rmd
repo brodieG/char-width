@@ -122,7 +122,7 @@ two.  In firefox neither is width two.
 So for a half-assed attempt at updating R we could go with the table
 designation.
 
-DON'T FORGET FLAGS.
+DON'T FORGET FLAGS (actually, they seem to be width one naturally).
 
 ### Zero Widths
 
