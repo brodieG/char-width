@@ -51,13 +51,12 @@ map <- transform(map, rid=ifelse(is.na(rid), -1L, rid))
 
 map <- transform(map, urid=cumsum(c(0L, (diff(uid) != 0) | (diff(rid) != 0))))
 
-# Drop the Mn, Me, Cf entries that are supposed to be zero width, as some of
-# these weirdly have a wide EAW representation that would override the
-# subsequent zero-width step
+# Drop the zero width entries, as some of these weirdly have a wide EAW
+# representation that would override the subsequent zero-width step
 
 map <- map[
-  !uall[match(map[['id']], uall[['V1']]), 'V3'] %in% c('Mn', 'Me', 'Cf', 'Cc') |
-  map[['id']] == 0xad  # soft-hyphen
+  !uall[match(map[['id']], uall[['V1']]), 'V3'] %in% ZW_GC |
+  map[['id']] %in% ZW_EXCLUDE_CP  # soft-hyphen
   ,
 ]
 # Collapse back to ranges for each uid/rid interaction, ignoring stuff less than
@@ -272,9 +271,11 @@ txtres <- txtres[order(lnstarts)]
 # and into final file
 
 txtfin <- c(raw[seq_len(rlstr)], txtres, raw[-seq_len(rlend)])
-message('skipping writing file')
-# writeLines(txtfin, 'rlocale_data2.h')
-
+if(!TRUE) {
+  writeLines(txtfin, 'rlocale_data2.h')
+} else {
+  message('skipping writing file')
+}
 # - Sanity Checks --------------------------------------------------------------
 
 # * Everything in order for each ifdef mode
