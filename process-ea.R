@@ -53,7 +53,9 @@ map <- transform(map, urid=cumsum(c(0L, (diff(uid) != 0) | (diff(rid) != 0))))
 # subsequent zero-width step
 
 map <- map[
-  !uall[match(map[['id']], uall[['V1']]), 'V3'] %in% c('Mn', 'Me', 'Cf', 'Cc')
+  !uall[match(map[['id']], uall[['V1']]), 'V3'] %in% c('Mn', 'Me', 'Cf', 'Cc') |
+  map[['id']] == 0xad  # soft-hyphen
+  ,
 ]
 # Collapse back to ranges for each uid/rid interaction, ignoring stuff less than
 # 0xa1 as R doesn't seem to care about that, and also get rid of all the -1
