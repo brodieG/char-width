@@ -155,12 +155,12 @@ Marcus Kuhn uses:
 ```
 
 U+00AD is softhyphen, U+1160..11FF are Hangul Jongseong, U+200B is zero width
-space (but it's in Cf??).
+space (but it's in Cf nowadays, so no longer necessary).
 
 Rlocale adds \p{gc=Cc}.
 
 Some `Mc` things are showing up in the R version, and this is not a version
-change, seems like the R version just has it wrong?.
+change, seems like the R version just has it wrong?
 
 ```
 0D46;MALAYALAM VOWEL SIGN E;Mc;0;L;;;;;N;;;;;  # unicode 12

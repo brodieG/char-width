@@ -1,7 +1,7 @@
 
 # - Generate 0 Widths ----------------------------------------------------------
 
-source('process-lib.r')
+source('process-lib.R')
 warning('should fill in gaps?')
 
 # Zero width code points.
@@ -9,15 +9,13 @@ warning('should fill in gaps?')
 ualls <- subset(
   uall[paste0('V', c(1,2,3,11))],
   (
-    # 0 width categories are enclosing, non-spacing, and
-    # controls (Cc not included by Kuhn, but included by R)
-    V3 %in% c('Me', 'Mn', 'Cf', 'Cc') |
-    # Hangul middle or terminal components not counted
-    V1 %in% 0x1160:0x11FF
+    # 0 width categories
+    V3 %in% ZW_GC,
+    # extra 0 width CPs
+    V1 %in% ZW_INCLUDE_CP
   ) &
-  # Soft-hyphen is considered category Cf, but has display
-  # width; possibly some other should too (e.g. U+0600-0605)
-  V1 != 0x00AD
+  # CPs that are not zero-width despite GC
+  (!V1 %in% ZW_EXCLUDE_CP)
 )
 # Groups of adjacent elements
 

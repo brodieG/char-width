@@ -5,6 +5,9 @@
 # The rlocale file contains addditional locale-specific width interpretations
 # that the unicode data does not have.  For this reason we never let the unicode
 # data override anything but the first column of the rlocale data.
+#
+# See also 'process-uni.R' for Zero width, and 'process-lib.R' for other "hard
+# coded" assumptions that affect width interpretation:
 
 # - Parse Unicode EAW ----------------------------------------------------------
 
@@ -87,7 +90,7 @@ map.c[['EAW']] <- udat[map.c[['uid']], 'V2']
 
 # Map EAW to width
 
-map.c[['W']] <- eaw[map.c[['EAW']]]
+map.c[['W']] <- EAW[map.c[['eaw']]]
 stopifnot(!anyNA(map.c[['EAW']]), !anyNA(map.c[['W']]))
 
 # If no rid, set all to new W value, otherwise update the first element

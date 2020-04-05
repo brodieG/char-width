@@ -1,3 +1,35 @@
+# - Assumptions ----------------------------------------------------------------
+
+# Width in columns of East Asian Designations; will be ignored for non-default
+# locales that had widths in original Rlocale_data.h
+
+EAW <- c(N=1L, Na=1L, W=2L, F=2L, H=1L, A=1L)
+
+# Zero Width General Categories, Cc not included by Kuhn but included by R
+
+ZW_GC <- c('Me', 'Mn', 'Cf', 'Cc') |
+
+# Soft hyphen is not zero width despite being Cf, as per Markus Kuhn
+# Possibly should add U+0600-0605, 08E2 (Arabic Signs), U+110BD,110CD (KAITHI
+# signs), (marked as Cf) and U+09BD (Mn), as gclib has those as 1 width, and
+# they appear to be one (or at least some) width AFAICT.
+
+ZW_EXCLUDE_CP <- 0x00AD
+
+# Hangul medial vowels and terminal consonants that get merged into the base
+# consonant in Korean
+
+ZW_INCLUDE_CP <- 0x1160:0x11FF
+
+# Unassigned wide from TR11
+
+WIDE_UNASSIGNED <- c(
+  0x3400:4DBF,     # CJK unified ideograms Extension A block
+  0x4E00:9FFF,     # CJK unified ideograms block
+  0xF900:FAFF,     # CJK compatibility Ideographs
+  0x20000:0x2FFFF, # Supplementary Ideographic Plane
+  0x30000:0x3FFFF  # Tertiary Ideographic Plane
+)
 # - Parse R EAW ----------------------------------------------------------------
 
 # Parse the R data that exists, look for `table_wcwidth` and the next table
@@ -101,7 +133,6 @@ all_points <- function(dat, prefix) {
 }
 # - Import Unicode EAW ---------------------------------------------------------
 
-eaw <- c(N=1L, Na=1L, W=2L, F=2L, H=1L, A=1L)
 uni_eaw <- function(file) {
   udat <- read.delim(
     stringsAsFactors = FALSE,
