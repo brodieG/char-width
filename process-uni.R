@@ -72,5 +72,9 @@ zfin <- c(
   "",
   raw[(zw_end - 1):length(raw)]
 )
-writeLines(zfin, 'rlocale_data2.h')
+if(!TRUE) {
+  writeLines(zfin, 'rlocale_data2.h')
+} else {
+  message("Skipping writing ZW data to file")
+}
 

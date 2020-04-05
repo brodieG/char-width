@@ -7,7 +7,7 @@ EAW <- c(N=1L, Na=1L, W=2L, F=2L, H=1L, A=1L)
 
 # Zero Width General Categories, Cc not included by Kuhn but included by R
 
-ZW_GC <- c('Me', 'Mn', 'Cf', 'Cc') |
+ZW_GC <- c('Me', 'Mn', 'Cf', 'Cc')
 
 # Soft hyphen is not zero width despite being Cf, as per Markus Kuhn
 # Possibly should add U+0600-0605, 08E2 (Arabic Signs), U+110BD,110CD (KAITHI
@@ -21,14 +21,17 @@ ZW_EXCLUDE_CP <- 0x00AD
 
 ZW_INCLUDE_CP <- 0x1160:0x11FF
 
-# Unassigned wide from TR11
+# Unassigned wide from TR11: oddly these are somewhat indirectly included in the
+# EAW data though missing e.g 2FFFF and 3FFFF.
+#
+# CURRENTLY UNUSED as already in EAW except for the two pointa above.
 
 WIDE_UNASSIGNED <- c(
-  0x3400:4DBF,     # CJK unified ideograms Extension A block
-  0x4E00:9FFF,     # CJK unified ideograms block
-  0xF900:FAFF,     # CJK compatibility Ideographs
-  0x20000:0x2FFFF, # Supplementary Ideographic Plane
-  0x30000:0x3FFFF  # Tertiary Ideographic Plane
+   0x3400:0x4DBF,   # CJK unified ideograms Extension A block
+   0x4E00:0x9FFF,   # CJK unified ideograms block
+   0xF900:0xFAFF,   # CJK compatibility Ideographs
+  0x20000:0x2FFFF,  # Supplementary Ideographic Plane
+  0x30000:0x3FFFF   # Tertiary Ideographic Plane
 )
 # - Parse R EAW ----------------------------------------------------------------
 
@@ -134,7 +137,7 @@ all_points <- function(dat, prefix) {
 # - Import Unicode EAW ---------------------------------------------------------
 
 uni_eaw <- function(file) {
-  udat <- read.delim(
+  udat <- read.delim(   # borrowed from Gábor
     stringsAsFactors = FALSE,
     file,
     comment.char = "#",
@@ -158,6 +161,10 @@ uni_eaw <- function(file) {
   # we rely on EastAsianWidth correctly representing emoji presentation
   # by marking the relevant code points as W or F (some emojis default to
   # emoji presentation, but others don't).
+
+  # Add the default wide ranges
+
+  # Sanity checks
 
   with(udat,
     stopifnot(

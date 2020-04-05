@@ -4,15 +4,17 @@
 #
 # The rlocale file contains addditional locale-specific width interpretations
 # that the unicode data does not have.  For this reason we never let the unicode
-# data override anything but the first column of the rlocale data.
+# data override anything but the first column of the rlocale data.  Additionally
+# rlocale_data.h has special ifdef handling for windows.  Most of the complexity
+# in the code that follows below is to preserver the extra locale and ifdef
+# data.
 #
 # See also 'process-uni.R' for Zero width, and 'process-lib.R' for other "hard
 # coded" assumptions that affect width interpretation:
 
 # - Parse Unicode EAW ----------------------------------------------------------
 
-# Read the EastAsianWidth.txt table into a data.frame (From Gábor),
-# first part:
+# Read the EastAsianWidth.txt table into a data.frame:
 
 source('process-lib.R')
 
@@ -25,14 +27,14 @@ udat <- uni_eaw("EastAsianWidth.txt")
 ldat <- parse_rlocale('rlocale_data.h')
 
 # originally the stuff in ldat was generated in the script and
-# was available to rest of script, hence the horror below as
+# was available to rest of script, hence the list2env horror below as
 # I don't want to go through and update all the code:
 
 list2env(ldat, environment())
 
 # - Map R Entries to Unicode ---------------------------------------------------
 
-# Generate a mapping of R's entries to unicode entries; need to
+# Generate a mapping of R's entries to unicode EAW entries; need to
 # handle fact there are duplicate R entries due to ifdef statements
 
 rallp <- all_points(rdat, 'r')
@@ -110,6 +112,9 @@ rm(rid.val)  # not valid anymore
 
 # - Recreate Text Entries ------------------------------------------------------
 
+# We need to regenerate the rlocale_data.h format, recovering previously
+# existing comments, ifdefs, etc.
+
 # Collapse sequential entries that are otherwise identical
 # Possibly a lot of this complexity could have been avoided
 # by pre-collapsing the unicode table?  Lots of distinctions
@@ -131,6 +136,7 @@ map.t <- with(map.c,
     rid_raw=ifelse(is.na(rid_raw), -1L, rid_raw)
 ) )
 map.t[c('start', 'end')] <- lapply(map.t[c('start', 'end')], as.hexmode)
+
 # Generate proxy ids for the new rids.  We'll use the prior
 # rid if there is one and it isn't part of an ifdef, or the
 # next one if not.
