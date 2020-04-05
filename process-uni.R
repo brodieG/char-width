@@ -1,17 +1,7 @@
 
 # - Generate 0 Widths ----------------------------------------------------------
 
-options(stringsAsFactors=FALSE)
-uall <- read.delim(
-  stringsAsFactors = FALSE,
-  "UnicodeData.txt",
-  comment.char = "#",
-  sep = ";",
-  strip.white = TRUE,
-  header = FALSE
-)
-uall[['V1']] <- as.hexmode(uall[['V1']])
-
+source('process-lib.r')
 warning('should fill in gaps?')
 
 # Zero width code points.
@@ -26,11 +16,10 @@ ualls <- subset(
     V1 %in% 0x1160:0x11FF
   ) &
   # Soft-hyphen is considered category Cf, but has display
-  # width
+  # width; possibly some other should too (e.g. U+0600-0605)
   V1 != 0x00AD
 )
 # Groups of adjacent elements
-# NEED TO RESOLVE ISSUE WHERE
 
 ualls <- transform(
   ualls,
@@ -65,8 +54,25 @@ zlfin[seq_len(length(zlnew) - 1)] <-
   paste0(zlfin[seq_len(length(zlnew) - 1)], ", ")
 
 zlmx <- matrix(zlfin, 3)
-writeLines(
-  do.call(paste0, c(unname(split(zlmx, row(zlmx))), list(collapse="\n"))),
-  'rlocale_zw.txt'
+ztxt <- do.call(paste0, c(unname(split(zlmx, row(zlmx)))))
+ztxt <- sub(' $', '', ztxt)
+
+zw_start <- grep(zero_width_start, raw, fixed=TRUE)
+zw_end <- grep(zero_width_end, raw, fixed=TRUE)
+
+stopifnot(
+  length(zw_start) == 1, length(zw_end) == 1, zw_start > 2,
+  zw_start < zw_end - 1
 )
+zfin <- c(
+  raw[1:(zw_start - 1)],
+  zero_width_start,
+  zero_width_comment,
+  zero_width_struct,
+  paste0("    ", ztxt),
+  "  };",
+  "",
+  raw[(zw_end - 1):length(raw)]
+)
+writeLines(zfin, 'rlocale_data2.h')
 

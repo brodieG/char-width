@@ -87,7 +87,7 @@ parse_rlocale <- function(rlocale) {
     rlstr=rlstr, rlend=rlend, raw=raw
   )
 }
-# - Expand Points -------------------------------------------------------------
+# - Expand Points --------------------------------------------------------------
 
 all_points <- function(dat, prefix) {
   sizes <- with(dat, end - start + 1L)
@@ -101,10 +101,11 @@ all_points <- function(dat, prefix) {
 }
 # - Import Unicode EAW ---------------------------------------------------------
 
-uni_eaw <- function(eaw) {
+eaw <- c(N=1L, Na=1L, W=2L, F=2L, H=1L, A=1L)
+uni_eaw <- function(file) {
   udat <- read.delim(
     stringsAsFactors = FALSE,
-    eaw,
+    file,
     comment.char = "#",
     sep = ";",
     strip.white = TRUE,
@@ -127,8 +128,6 @@ uni_eaw <- function(eaw) {
   # by marking the relevant code points as W or F (some emojis default to
   # emoji presentation, but others don't).
 
-  eaw <- c(N=1L, Na=1L, W=2L, F=2L, H=1L, A=1L)
-
   with(udat,
     stopifnot(
       all(V2 %in% names(eaw)),
@@ -139,4 +138,54 @@ uni_eaw <- function(eaw) {
   )
   udat
 }
+# - Read in the Unicode Table --------------------------------------------------
+
+uall <- read.delim(
+  stringsAsFactors = FALSE,
+  "UnicodeData.txt",
+  comment.char = "#",
+  sep = ";",
+  strip.white = TRUE,
+  header = FALSE
+)
+uall[['V1']] <- as.hexmode(uall[['V1']])
+
+# - Zero Width Comments --------------------------------------------------------
+
+zero_width_start <-
+
+"/* -------------------helper for wcwidth -------------------- */"
+
+zero_width_end <-
+
+"zero_width_count = (sizeof(zero_width)/sizeof(struct interval));"
+
+zero_width_comment <-
+
+"
+/* From http://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c
+ *    - Non-spacing and enclosing combining characters (general
+ *      category code Mn or Me in the Unicode database) have a
+ *      column width of 0.
+ *
+ *    - SOFT HYPHEN (U+00AD) has a column width of 1.
+ *
+ *    - Other format characters (general category code Cf in the Unicode
+ *      database) and ZERO WIDTH SPACE (U+200B) have a column width of 0.
+ *
+ *    - Hangul Jamo medial vowels and final consonants (U+1160-U+11FF)
+ *      have a column width of 0.
+ *
+ *    - Added for our purposes the Unicode control characters
+ *
+ *    Updated based on the Unicode 12.1.0 tables at
+ *    https://www.unicode.org/Public/12.1.0/ucd/UnicodeData.txt
+ *    https://www.unicode.org/Public/12.1.0/ucd/EastAsianWidth.txt
+ */
+ "
+
+zero_width_struct <-
+
+"static const struct interval zero_width[] = {"
+
 
