@@ -87,7 +87,7 @@ map.c <- cbind(
 )
 rid.val <- map.c$rid >= 0
 map.c[rid.val, wcols] <- rdat[map.c[['rid']][rid.val], wcols]
-map.c[['EAW']] <- udat[map.c[['uid']], 'V2']
+map.c[['eaw']] <- udat[map.c[['uid']], 'V2']
 
 # Map EAW to width
 
