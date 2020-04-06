@@ -277,11 +277,8 @@ txtres <- txtres[order(lnstarts)]
 # and into final file
 
 txtfin <- c(raw[seq_len(rlstr)], txtres, raw[-seq_len(rlend)])
-if(!TRUE) {
-  writeLines(txtfin, 'rlocale_data2.h')
-} else {
-  message('skipping writing file')
-}
+writeLines(txtfin, 'rlocale_data2.h')
+
 # - Sanity Checks --------------------------------------------------------------
 
 # * Everything in order for each ifdef mode

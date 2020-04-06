@@ -2,7 +2,6 @@
 # - Generate 0 Widths ----------------------------------------------------------
 
 source('process-lib.R')
-warning('should fill in gaps?')
 
 # Zero width code points.
 
@@ -10,11 +9,11 @@ ualls <- subset(
   uall[paste0('V', c(1,2,3,11))],
   (
     # 0 width categories
-    V3 %in% ZW_GC,
+    V3 %in% ZW_GC |
     # extra 0 width CPs
     V1 %in% ZW_INCLUDE_CP
   ) &
-  # CPs that are not zero-width despite GC
+  # CPs that are not zero-width despite General Category
   (!V1 %in% ZW_EXCLUDE_CP)
 )
 # Groups of adjacent elements
@@ -30,20 +29,10 @@ zlnew <- c(
       ualls,
       tapply(hex, grp, function(x) paste0(x[c(1L, length(x))], collapse=", "))
 ) ) )
-# - Parse Zero Widths ----------------------------------------------------------
-
-# This is to compare to original
-
-raw <- readLines('rlocale_data2.h')
-rlstr <- grep('static const struct interval zero_width\\[\\]', raw)
-txt <- raw[seq(rlstr, length(raw))]
-gr <- gregexpr("0x[0-9A-F]+, 0x[0-9A-F]+", txt)
-zlold <- unlist(regmatches(txt, gr))
-
-# diffobj::diffChr(zlold, zlnew)
-
+#
 # - Generate Text --------------------------------------------------------------
 
+raw <- readLines('rlocale_data2.h')
 l <- length(zlnew)
 lf <- ceiling(l / 3) * 3
 zlfin <- character(lf)
@@ -72,9 +61,5 @@ zfin <- c(
   "",
   raw[(zw_end - 1):length(raw)]
 )
-if(!TRUE) {
-  writeLines(zfin, 'rlocale_data2.h')
-} else {
-  message("Skipping writing ZW data to file")
-}
+writeLines(zfin, 'rlocale_data2.h')
 
