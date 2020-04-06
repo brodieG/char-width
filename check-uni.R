@@ -148,12 +148,29 @@ subset(width_one_to_zero, !comp_uni(r4.0, glibc, utf8, stri))
 # glibc takes a stronger stane on some items that should be width 0 but it
 # considered width 1.  U+110bd is Cf, but  it looks more like a
 # spacing mark than a format control.  It combines with the next character, but
-# takes up space.  Simlarly with the arabic marks in the U+0600-0605 range.
+# takes up space.  
 #
 # writeLines(c('\U000110bd', '\U00011083\U000110bd', '\U000110bd\U00011083'))
 # 𑂽
 # 𑂃𑂽
 # 𑂽𑂃
+#
+# Similarly with the Arabic combining marks, which take up one space, but then
+# some of them, particularly U+0605, overlap with subsequent ones.
+#
+# writeLines(c('\u0600\u0669\u0669\u0669\u0669'))
+# writeLines(c('\u0601\u0669\u0669\u0669\u0669'))
+# writeLines(c('\u0602\u0669\u0669\u0669\u0669'))
+# writeLines(c('\u0603\u0669\u0669\u0669\u0669'))
+# writeLines(c('\u0604\u0669\u0669\u0669\u0669'))
+# writeLines(c('\u0605\u0669\u0669\u0669\u0669'))
+#
+# These appear to be called "subtending marks":
+# per https://www.unicode.org/L2/L2009/09144r3-arabic-samvat.pdf
+# though they are # categorized Cf
+# See also: http://www.unicode.org/reports/tr20/tr20-9.html#Subtending
+# Browsers just don't seem to know what to do with them.
+
 
 subset(width_one_to_zero, !(r4.0 == glibc) & glibc == 1)
 
@@ -169,10 +186,20 @@ subset(width_one_to_greater, !comp_uni(r4.0, glibc, utf8, stri))
 width_zero_to_greater <- subset(res, r3.6 != r4.0 & r3.6 == 0)
 subset(width_zero_to_greater, !comp_uni(r4.0, glibc, utf8, stri))
 
-# These include a subset of the surrogates that got there by virtue of the bug
-# in handling of them in R (where the high surrogate is used twice).
+# These include:
+# * a subset of the surrogates that got there by virtue of the bug
+#   in handling of them in R (where the high surrogate is used twice).
+# * The I-Ching hexagrams U+4DC0..4DFF used to be considered wide, but no longer
+#   are.  The glyphs seem to a little over 1 column wide on my terminal and
+#   browser, though the terminal places them as being 1 wide.  glibc agrees with 
+#   R3.6, and this seems reasonable.
+# * Circled number ideograms e.g (10), (20), etc in U+3248-324F, which
+#   definitely look wide, but terminal does not display them wide. glibc also
+#   agrees with R3.6.
 
 width_greater_to_other <- subset(res, r3.6 != r4.0 & r3.6 > 1)
+
+# Make sure we actually looked at all the differences, excluding surrogates
 
 checked <- sort(
   unique(
