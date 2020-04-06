@@ -35,8 +35,8 @@ WIDE_UNASSIGNED <- c(
 )
 # - Parse R EAW ----------------------------------------------------------------
 
-# Parse the R data that exists, look for `table_wcwidth` and the next table
-# after that, and process the data in between
+# Parse the R EAW data that exists in rlocale_data.h, look for `table_wcwidth`
+# and the next table after that, and process the data in between
 
 options(stringsAsFactors=FALSE)
 
@@ -124,6 +124,8 @@ parse_rlocale <- function(rlocale) {
 }
 # - Expand Points --------------------------------------------------------------
 
+# Expand code point ranges to full point range
+
 all_points <- function(dat, prefix) {
   sizes <- with(dat, end - start + 1L)
   allp <- with(
@@ -168,7 +170,7 @@ uni_eaw <- function(file) {
 
   with(udat,
     stopifnot(
-      all(V2 %in% names(eaw)),
+      all(V2 %in% names(EAW)),
       all(start <= end),
       all(diff(start) > 0),
       all(diff(end) > 0)
@@ -189,6 +191,8 @@ uall <- read.delim(
 uall[['V1']] <- as.hexmode(uall[['V1']])
 
 # - Zero Width Comments --------------------------------------------------------
+
+# Comments that we'll need to update in the final file
 
 zero_width_start <-
 

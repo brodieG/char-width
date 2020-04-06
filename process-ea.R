@@ -9,7 +9,7 @@
 # in the code that follows below is to preserver the extra locale and ifdef
 # data.
 #
-# See also 'process-uni.R' for Zero width, and 'process-lib.R' for other "hard
+# See also 'process-zw.R' for Zero width, and 'process-lib.R' for other "hard
 # coded" assumptions that affect width interpretation:
 
 # - Parse Unicode EAW ----------------------------------------------------------
