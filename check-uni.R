@@ -157,19 +157,23 @@ subset(width_one_to_zero, !comp_uni(r4.0, glibc, utf8, stri))
 # best.  E.g. soft-hyphen are supposed to indicate valid work-break points
 # within words, and should not be shown unless a word is actually broken at that
 # point.  FF does this correctly, OS X terminal just shows it, iterm2 shows a
-# blank.  Note soft-hyphen is not PCM, just ignorable.
+# blank.  Note soft-hyphen is not PCM, just ignorable.  There is however some
+# controversy as e.g. ISO 8859-1 states that the soft hyphen is not a
+# hyphenation hint, rather, it is the hyphen displayed after a word has been
+# hyphenated to break a line[11].
 #
 # More broadly, some of the PCMs should be treated as non-spacing or enclosing
 # marks.  For example U+0605 is a supralinear mark over the subsequent numbers
 # and shouldn't have advance width[2].  U+0600-0602 are less clear, with
-# typographical examples suggesting that they should advance maybe one element
+# some typographical examples suggesting that they should advance maybe one element
 # (or half) [3][9].  E.g. for the year sign Sanah, it appears it has a spot
 # reserved for the calendar designation (christian/arabic) so it's zero advanced
 # if it is specified, but if it isn't it advances (debatable, the actual typeset
-# version shows some spacing even with the "c" specified).  For the footnote
-# marker it appears to create an advance on the left, and the number mark an
-# advance to the right, mabye.  All of these as well as U+06DD were originally
-# proposed[5][8] as Gc == 'Me'.
+# version in [9] shows some spacing even with the "c" specified, also, one
+# source clearly shows no advance[5]).  For the footnote marker it appears to
+# create an advance on the left, and the number mark an advance to the right,
+# mabye.  All of these as well as U+06DD were originally proposed[5][8] as Gc ==
+# 'Me'.
 #
 # U+0604[3] and U+110bd[7] on subtend over following characters, but look like
 # more obviously like they should take up an advance element (respectively after
@@ -189,6 +193,7 @@ subset(width_one_to_zero, !comp_uni(r4.0, glibc, utf8, stri))
 # [7]: https://www.unicode.org/L2/L2008/08400-kaithi-num-sign.pdf
 # [8]: https://www.unicode.org/wg2/docs/n2483.pdf
 # [9]: https://www.unicode.org/L2/L2001/01426-arabic_marks_examples.pdf
+# [11]: http://jkorpela.fi/shy.html
 #
 # writeLines(c('\U000110bd', '\U00011083\U000110bd', '\U000110bd\U00011083'))
 # 𑂽
@@ -226,10 +231,24 @@ subset(width_zero_to_greater, !comp_uni(r4.0, glibc, utf8, stri))
 # * The I-Ching hexagrams U+4DC0..4DFF used to be considered wide, but no longer
 #   are.  The glyphs seem to a little over 1 column wide on my terminal and
 #   browser, though the terminal places them as being 1 wide.  glibc agrees with
-#   R3.6, and this seems reasonable.
+#   R3.6, and this seems reasonable.  Other sources support the wide display[10]
 # * Circled number ideograms e.g (10), (20), etc in U+3248-324F, which
 #   definitely look wide, but terminal does not display them wide. glibc also
 #   agrees with R3.6.
+#
+# The number ideograms are from ARIB STD 24, and it makes sense that they are
+# considered wide by glibc, but what doesn't make sense is there are a lot more
+# of similar 2-byte ARIB STD 24 ideographs that look like they should be
+# rendered wide that are considered narrow by glibc (e.g. U+1F12F:1f169).
+# Should we really single out those 8 for special treatment?
+#
+# Someone else also thinks this is a bug[12].  And lots of controversy in a a
+# bug-report discussion.  Unicode site is down so I can't check the original
+# unicode question.
+#
+# [10]: https://www.unicode.org/wg2/docs/n2363.pdf
+# [12]: https://sourceware.org/bugzilla/show_bug.cgi?id=24658
+# [13]: https://sourceware.org/bugzilla/show_bug.cgi?id=21750
 
 width_greater_to_other <- subset(res, r3.6 != r4.0 & r3.6 > 1)
 

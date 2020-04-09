@@ -14,14 +14,7 @@ From: https://www.unicode.org/reports/tr11/tr11-31.html
 * Na: East Asian Narrow: All other characters that are always narrow
 * A: Ambiguous: characters that might be narrow or wide and require additional
   information (e.g. Locale, as shown by `table_wcwidth`).
-* N: Neutral, behave as narrow (not East Asian), although it seems that some of
-  the so-labeled Neutral characters are actually better thought of as zero
-  width, e.g. the 200B..200F range:
-
-```
-200B..200F;N     # Cf     [5] ZERO WIDTH SPACE..RIGHT-TO-LEFT MARK
-```
-This is discussed in tr11 section 6.2:
+* N: Neutral (unless Cf)
 
 > In particular, nonspacing marks do not possess actual advance width.
 > Therefore, even when displaying combining marks, the East_Asian_Width property
@@ -65,6 +58,7 @@ Recommendations:
 >   by default [OPPOSITE OF r-utf8].
 > * Emoji style standardized variation sequences behave as though they were East
 >   Asian Wide, regardless of their assigned East_Asian_Width property value.
+>   (these are the emoji followed by U+FE0F).
 
 What about Zero Width?  They don't appear specifically in the table, and many of
 the known zero width controls are just "N".
@@ -121,8 +115,6 @@ two.  In firefox neither is width two.
 
 So for a half-assed attempt at updating R we could go with the table
 designation.
-
-DON'T FORGET FLAGS (actually, they seem to be width one naturally).
 
 ### Zero Widths
 
@@ -266,7 +258,8 @@ NOTE: UCS is Universal Coded Character Set, which is supposed to be:
 Here is the width from "main/rlocale.c".  Changing logic to allow multi-element
 emoji will require a bit of surgery, probably to `R_nchar`.
 
-Question: what is the i18 business (appears related to ICU).
+Question: what is the i18 business (appears related to ICU) (i18n =
+internationalization).
 
 ```
 int Ri18n_wcwidth(Rwchar_t c)
