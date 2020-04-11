@@ -58,7 +58,7 @@ map <- transform(map, urid=cumsum(c(0L, (diff(uid) != 0) | (diff(rid) != 0))))
 
 map <- map[
   !uall[match(map[['id']], uall[['V1']]), 'V3'] %in% ZW_GC |
-  map[['id']] %in% ZW_EXCLUDE_CP  # soft-hyphen
+  map[['id']] %in% ZW_EXCLUDE_CP
   ,
 ]
 # Collapse back to ranges for each uid/rid interaction, ignoring stuff less than

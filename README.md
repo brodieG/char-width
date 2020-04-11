@@ -15,7 +15,7 @@ In order to replicate the results discussed here we also need to apply the patch
 proposed in [17755][15], otherwise there will be differences in results when
 for code points reserved for UTF-16 surrogates.
 
-These updates are only partial.  Other things that could/should be done:
+These updates do are only partial.  Other things that could/should be done:
 
 * Update the other tables in 'rlocale_data.h'.
 * Compute width on graphemes instead of Unicode code points; this is likely to
