@@ -60,8 +60,7 @@ Recommendations:
 >   Asian Wide, regardless of their assigned East_Asian_Width property value.
 >   (these are the emoji followed by U+FE0F).
 
-What about Zero Width?  They don't appear specifically in the table, and many of
-the known zero width controls are just "N".
+See zero width section for those.
 
 > All private-use characters are by default classified as Ambiguous, because
 > their definition depends on context.
@@ -70,7 +69,7 @@ the known zero width controls are just "N".
 > Wide. Those ranges are: [NOTE: These seem to all be in the table]
 >
 > * the CJK Unified Ideographs block, 4E00..9FFF
-> * the CJK Unified Ideographs Externsion A block, 3400..4DBF
+> * the CJK Unified Ideographs Extension A block, 3400..4DBF
 > * the CJK Compatibility Ideographs block, F900..FAFF
 > * the Supplementary Ideographic Plane, 20000..2FFFF
 > * the Tertiary Ideographic Plane, 30000..3FFFF

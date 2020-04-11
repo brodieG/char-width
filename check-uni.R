@@ -243,7 +243,7 @@ subset(width_zero_to_greater, !comp_uni(r4.0, glibc, utf8, stri))
 # Should we really single out those 8 for special treatment?
 #
 # Someone else also thinks this is a bug[12].  And lots of controversy in a a
-# bug-report discussion.  Unicode site is down so I can't check the original
+# bug-report discussion[13].  Unicode site is down so I can't check the original
 # unicode question.
 #
 # [10]: https://www.unicode.org/wg2/docs/n2363.pdf
