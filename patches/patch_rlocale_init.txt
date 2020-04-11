@@ -1,8 +1,8 @@
-diff --git a/rlocale_data.h b/rlocale_data.h
-index c50b526..f850783 100644
---- a/rlocale_data.h
-+++ b/rlocale_data.h
-@@ -461,13 +461,13 @@ static const struct interval_wcwidth table_wcwidth[] = {
+Index: src/main/rlocale_data.h
+===================================================================
+--- src/main/rlocale_data.h	(revision 78116)
++++ src/main/rlocale_data.h	(working copy)
+@@ -461,13 +461,13 @@
      {0x31f0,0x321c,{2,2,2,2,2,2,2}},
      {0x321d,0x321e,{2,2,2,2,2,2,2}},
      {0x3220,0x32cf,{2,2,2,2,2,2,2}},
