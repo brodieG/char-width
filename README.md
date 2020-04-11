@@ -3,17 +3,41 @@
 ## Overview
 
 This repository is a collection of scripts, data, and documentation used to
-update the tables in 'src/main/rlocale.h' from the c.a. 2015 Unicode 8 tables to
-more recent versions.
+update the tables in 'src/main/rlocale_data.h' from the c.a. 2015 Unicode 8
+tables to more recent versions (12.1 under the current proposal).
 
-## Rlocale Update
+These tables are used by `R_nchar` (itself used by `base::nchar`), and via
+`R_i18n_wcwidth|R_i18n_wcswidth` in character.c, errors.c, printUtils.c,
+../gnuwin32/console.c ../gnuwin32/getline/getline.c,
+grDevices/src/{devPS,devPicTex.c}.
+
+In order to replicate the results discussed here we also need to apply the patch
+proposed in [17755][15], otherwise there will be differences in results when
+for code points reserved for UTF-16 surrogates.
+
+These updates are only partial.  Other things that could/should be done:
+
+* Update the other tables in 'rlocale_data.h'.
+* Compute width on graphemes instead of Unicode code points; this is likely to
+  be a bigger change that could possibly leverage ICU on systems that have it,
+  but will likely still require updating the width tables.
+* Change the look-up tables to be multi-stage tables for performance as
+  recommended by Unicode, particularly as we're increasing the table sizes.
+
+## rlocale_data.h Update
 
 In order to update Rlocale, we must first apply a minor patch to fix some
-seeming minor bugs in the code, and then run `update_r_locale.R`.
+seeming minor bugs in the code, and then run `R/update_r_locale_data.R`.
 
 Unlike the Unicode tables, `rlocale_data.h` has specific widths for East Asian
-Ambiguous that are locale-dependent.  The update process does not touch those at
-all, and only modifies the default locale values.
+(mostly) Ambiguous that are locale-dependent.  The update process does not touch
+those at all, and only modifies the default locale values.  Entries to other
+locales will be added where they did not exist previously.
+
+We preserve the existing `ifdef` structures for win32, and preserve existing
+comments as much as possible, at least for the widths table.  The zero width
+table is regenerated completely, so inline comments there are lost though those
+seem less important.
 
 ## Checks
 
@@ -32,27 +56,42 @@ See `check_widths.R` for details.
 
 ### Rules
 
-In cascading order:
+In cascading order. Once a code point is matched its width is set and is no
+longer eligible to be changed by subsequent rules:
 
 * One Width:
     * U+00AD (Soft-Hyphen)
     * Prepending Marks.
 * Zero Width:
-    * Remaining code points with Unicode General Category Mn (non-spacing mark), 
-      Me (enclosing mark), Cf (Format control)
-    * Remaining code points with General Category  Cc (control)
+    * Code points with General Category Mn (non-spacing mark)
+    * Code points with General Category Me (enclosing mark)
+    * Code points with General Category Mf (format control)
+    * Code points with General Category Cc (control, originally added by R)
 * Two Width:
-    * Remaining code points that have Unicode East Asian Width Property "W" or
-      "F"
+    * Code points that have East Asian Width Property "W" or "F"
     * Circled number "ideograms" from ARIB STD 24 (U+3248-324F)
     * I Ching hexagrams (U+4DC0-4DFF).
-* Everything else one width.
+* Everything else in Unicode range is one width (note EAW specifies widths for
+  some unassigned points).
 
-The width assumptions line mostly with what `glibc` does, except that
+The width assumptions intend to line up with what `glibc` does, except that
 unspecified code points are computed per the above rules, whereas `glibc`
 returns `-1` for them.
 
+Other code calling the width routines should check for validity of code points
+(e.g. no UTF-8 encoded UTF-16 surrogates).
+
+See `process_width` in 'glibc(2.29)/localedata/unicode-gen/utf8_gen.py@220' in
+the [glibc repo][14].
+
 ### Details On Non-Unicode Decisions
+
+#### Glibc
+
+Comments in the sources as well as some of the reported width values in the
+pre-patch version strongly suggest `glibc` was used to generate or valid the
+original tables, for this reason we make the same non-standard assumptions that
+`glibc` makes, even though this may be controversial in some cases.
 
 #### Soft Hyphen U+00AD
 
@@ -95,15 +134,15 @@ code points if they are not supported...
 
 PCMs also correlate close with the prepend [Grapheme Cluster Break Property][6].
 
-#### Random Wide Characters
+#### Other Wide Characters
 
-`glibc` treats a few characters as wide that no one else does.  These include:
+`glibc` treats a few characters as wide that others don't.  These include:
 
+* Circled number ideograms e.g (10), (20), etc in U+3248-324F, which
+  definitely look wide, but terminal does not display them wide.
 * The I Ching hexagrams U+4DC0..4DFF. The glyphs seem to a little over 1 column
   wide on my terminal and browser, though the terminal places them as being 1
   wide.  Other sources support the wide display[10].
-* Circled number ideograms e.g (10), (20), etc in U+3248-324F, which
-  definitely look wide, but terminal does not display them wide.
 
 The number ideograms are from ARIB STD 24, and it makes sense that they are
 considered wide by glibc, but what doesn't make sense is there are a lot more
@@ -128,5 +167,6 @@ unicode question.
 [11]: http://jkorpela.fi/shy.html
 [12]: https://sourceware.org/bugzilla/show_bug.cgi?id=24658
 [13]: https://sourceware.org/bugzilla/show_bug.cgi?id=21750
-
+[14]: https://www.gnu.org/software/libc/sources.html
+[15]: https://bugs.r-project.org/bugzilla/show_bug.cgi?id=17755
 
