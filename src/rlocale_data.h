@@ -498,9 +498,7 @@ static const struct interval_wcwidth table_wcwidth[] = {
     {0x3190,0x31ba,{2,2,2,2,2,2,2}},
     {0x31c0,0x31e3,{2,2,2,2,2,2,2}},
     {0x31f0,0x321e,{2,2,2,2,2,2,2}},
-    {0x3220,0x3247,{2,2,2,2,2,2,2}},
-    {0x3248,0x324f,{1,2,2,2,2,2,2}},
-    {0x3250,0x32cf,{2,2,2,2,2,2,2}},
+    {0x3220,0x32cf,{2,2,2,2,2,2,2}},
 //    {0x3250,0x327b,{2,2,2,2,2,2,2}},  // overlap with previous
 //    {0x327c,0x32cf,{2,2,2,2,2,2,2}},  // overlap with previous
     {0x32d0,0x32fe,{2,2,2,2,2,2,2}},
@@ -510,7 +508,7 @@ static const struct interval_wcwidth table_wcwidth[] = {
     {0x33de,0x33ff,{2,2,2,2,2,2,2}},
     {0x3400,0x4db5,{2,2,2,2,2,2,2}}, // CJK Unified Ideographs Externsion A (to 4dbf)
     {0x4db6,0x4dbf,{2,2,2,2,2,2,2}},
-    {0x4dc0,0x4dff,{1,2,2,2,2,2,2}},
+    {0x4dc0,0x4dff,{2,2,2,2,2,2,2}},
     {0x4e00,0x9fcc,{2,2,2,2,2,2,2}}, // CJK Unified Ideographs (to 9fff)
     {0x9fcd,0x9fff,{2,2,2,2,2,2,2}},
     {0xa000,0xa48c,{2,2,2,2,2,2,2}},

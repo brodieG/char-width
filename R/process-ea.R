@@ -18,6 +18,14 @@
 
 udat <- uni_eaw("data/EastAsianWidth.txt")
 
+# Change the special glibc ranges, at least for 12.1.0 they neatly correspond
+# to EAW ranges, if they don't we'll have to write more complex code.
+
+for(i in WIDE_GLIBC) {
+  udati <- with(udat, which(start == i[1] & end == i[length(i)]))
+  if(!length(udat)) stop("Special glibc range does not map 1:1 to EAW range")
+  udat[udati, "V2"] <- "W"
+}
 # We should probably collapse ranges that are contiguous and have the
 # same width property as we are not currently using any of the other
 # properties that cause ranges to be split.

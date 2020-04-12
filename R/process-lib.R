@@ -86,11 +86,10 @@ WIDE_UNASSIGNED <- c(
 )
 # Additional wide characters for Glibc
 
-WIDE_GLIBC <- c(
+WIDE_GLIBC <- list(
   0x3248:0x324F,     # ARIB STD 24 speed limits
   0x4DC0:0x4DFF      # I Ching hexagrams
 )
-
 # - Parse R EAW ----------------------------------------------------------------
 
 # Parse the R EAW data that exists in rlocale_data.h, look for `table_wcwidth`
