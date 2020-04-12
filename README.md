@@ -26,8 +26,9 @@ These updates do are only partial.  Other things that could/should be done:
 
 ## rlocale_data.h Update
 
-In order to update Rlocale, we must first apply a minor patch to fix some
-seeming minor bugs in the code, and then run `R/update_r_locale_data.R`.
+In order to update Rlocale, we must first apply a minor patch
+(`patches/patch-rloc-dat-init.txt`) to fix some minor bugs in the existing
+tables, and then run `R/update-r-loc-dat.R`.
 
 Unlike the Unicode tables, `rlocale_data.h` has specific widths for East Asian
 (mostly) Ambiguous that are locale-dependent.  The update process does not touch
@@ -48,7 +49,7 @@ with the following programs:
 * utf8(1.2.0)::utf8_width   (Unicode 12, but github only)
 * stri(1.4.6)::stri_width   (Unicode 10 - ICU4C 61.1)
 * R 3.6.3                   (Unicode 8)
-* R 4.0 r78107 w/ patch     (Unicode 12.1)
+* R 4.0 r78116 w/ patch     (Unicode 12.1)
 
 See `check_widths.R` for details.
 
@@ -61,18 +62,19 @@ longer eligible to be changed by subsequent rules:
 
 * One Width:
     * U+00AD (Soft-Hyphen)
-    * Prepending Marks.
+    * Prepending Marks
 * Zero Width:
     * Code points with General Category Mn (non-spacing mark)
     * Code points with General Category Me (enclosing mark)
-    * Code points with General Category Mf (format control)
-    * Code points with General Category Cc (control, originally added by R)
+    * Code points with General Category Cf (format control)
+    * Code points with General Category Cc (C0 or C1 controls, originally added
+      by R)
 * Two Width:
     * Code points that have East Asian Width Property "W" or "F"
     * Circled number "ideograms" from ARIB STD 24 (U+3248-324F)
     * I Ching hexagrams (U+4DC0-4DFF).
 * Everything else in Unicode range is one width (note EAW specifies widths for
-  some unassigned points).
+  some unassigned points)
 
 The width assumptions intend to line up with what `glibc` does, except that
 unspecified code points are computed per the above rules, whereas `glibc`
@@ -150,8 +152,8 @@ of similar 2-byte ARIB STD 24 ideographs that look like they should be
 rendered wide that are considered narrow by glibc (e.g. U+1F12F:1f169).
 Should we really single out those 8 for special treatment?
 
-Someone else also thinks this is a bug[12].  And lots of controversy in a a
-bug-report discussion[13].  Unicode site is down so I can't check the original
+Someone else also thinks this is a [bug][12].  And lots of controversy in a
+[bug-report discussion][13].  Unicode site is down so I can't check the original
 unicode question.
 
 [1]: http://unicode.org/L2/L2002/02368-default-ignorable.html

@@ -1,3 +1,43 @@
+# - Utils ----------------------------------------------------------------------
+
+# Convert standard unicode code point ranges to start/end columns
+# Assumes code points are in "V1" column
+
+range_to_points <- function(dat) {
+  stopifnot(!c('start', 'end') %in% names(dat))
+  points <- strsplit(dat[['V1']], '..', fixed=TRUE)
+  lens <- lengths(points)
+  stopifnot(all(lens > 0 & lens < 3))
+  for(i in seq_along(points)) length(points[[i]]) <- 2
+  points <- matrix(unlist(points), 2)
+
+  dat[['start']] <- points[1,]
+  dat[['end']] <- points[2,]
+  dat <- within(dat, end[is.na(end)] <- start[is.na(end)])
+  dat[c('start', 'end')] <- lapply(dat[c('start', 'end')], as.hexmode)
+
+  # Sanity checks
+
+  with(dat,
+    stopifnot(
+      all(start <= end),
+      all(diff(start) > 0),
+      all(diff(end) > 0)
+  ) )
+  dat
+}
+# Expand code point ranges to full point range
+
+all_points <- function(dat, prefix) {
+  sizes <- with(dat, end - start + 1L)
+  allp <- with(
+    dat,
+    data.frame(
+      id=rep(start - 1L, sizes) + sequence(sizes),
+      id2=rep(seq_len(nrow(dat)), sizes)
+  ) )
+  setNames(allp, c('id', paste0(prefix, 'id')))
+}
 # - Assumptions ----------------------------------------------------------------
 
 # Width in columns of East Asian Designations; will be ignored for non-default
@@ -9,13 +49,24 @@ EAW <- c(N=1L, Na=1L, W=2L, F=2L, H=1L, A=1L)
 
 ZW_GC <- c('Me', 'Mn', 'Cf', 'Cc')
 
-# Soft hyphen is not zero width despite being Cf, as per Markus Kuhn
-# Possibly should add U+0600-0605, 08E2 (Arabic Signs), U+110BD,110CD (KAITHI
-# signs), (marked as Cf) and U+09BD (Mn), as gclib has those as 1 width, and
-# they appear to be one (or at least some) width AFAICT.
+# Zero Width Exclusions
 
-ZW_EXCLUDE_CP <- 0x00AD
-
+prop_list <- range_to_points(
+  subset(
+    read.delim(   # borrowed from Gábor
+      stringsAsFactors = FALSE,
+      "data/propList.txt",
+      comment.char = "#",
+      sep = ";",
+      strip.white = TRUE,
+      header = FALSE
+    ),
+    V2 == 'Prepended_Concatenation_Mark'
+) )
+ZW_EXCLUDE_CP <- c(
+  0x00AD,                                                # soft hyphen
+  all_points(prop_list[c('start', 'end')], 'pcm')[[1]]   # prepending marks
+)
 # Hangul medial vowels and terminal consonants that get merged into the base
 # consonant in Korean
 
@@ -24,7 +75,7 @@ ZW_INCLUDE_CP <- 0x1160:0x11FF
 # Unassigned wide from TR11: oddly these are somewhat indirectly included in the
 # EAW data though missing e.g 2FFFF and 3FFFF.
 #
-# CURRENTLY UNUSED as already in EAW except for the two pointa above.
+# CURRENTLY UNUSED as already in EAW except for the two points above.
 
 WIDE_UNASSIGNED <- c(
    0x3400:0x4DBF,   # CJK unified ideograms Extension A block
@@ -33,6 +84,13 @@ WIDE_UNASSIGNED <- c(
   0x20000:0x2FFFF,  # Supplementary Ideographic Plane
   0x30000:0x3FFFF   # Tertiary Ideographic Plane
 )
+# Additional wide characters for Glibc
+
+WIDE_GLIBC <- c(
+  0x3248:0x324F,     # ARIB STD 24 speed limits
+  0x4DC0:0x4DFF      # I Ching hexagrams
+)
+
 # - Parse R EAW ----------------------------------------------------------------
 
 # Parse the R EAW data that exists in rlocale_data.h, look for `table_wcwidth`
@@ -122,20 +180,6 @@ parse_rlocale <- function(rlocale) {
     rlstr=rlstr, rlend=rlend, raw=raw
   )
 }
-# - Expand Points --------------------------------------------------------------
-
-# Expand code point ranges to full point range
-
-all_points <- function(dat, prefix) {
-  sizes <- with(dat, end - start + 1L)
-  allp <- with(
-    dat,
-    data.frame(
-      id=rep(start - 1L, sizes) + sequence(sizes),
-      id2=rep(seq_len(nrow(dat)), sizes)
-  ) )
-  setNames(allp, c('id', paste0(prefix, 'id')))
-}
 # - Import Unicode EAW ---------------------------------------------------------
 
 uni_eaw <- function(file) {
@@ -149,40 +193,22 @@ uni_eaw <- function(file) {
   )
   # Generate and validate the ranges
 
-  points <- strsplit(udat[['V1']], '..', fixed=TRUE)
-  lens <- lengths(points)
-  stopifnot(all(lens > 0 & lens < 3))
-  for(i in seq_along(points)) length(points[[i]]) <- 2
-  points <- matrix(unlist(points), 2)
-
-  udat[['start']] <- points[1,]
-  udat[['end']] <- points[2,]
-  udat <- within(udat, end[is.na(end)] <- start[is.na(end)])
-  udat[c('start', 'end')] <- lapply(udat[c('start', 'end')], as.hexmode)
+  udat <- range_to_points(udat)
 
   # we rely on EastAsianWidth correctly representing emoji presentation
   # by marking the relevant code points as W or F (some emojis default to
   # emoji presentation, but others don't).
 
-  # Add the default wide ranges
-
   # Sanity checks
 
-  with(udat,
-    stopifnot(
-      all(V2 %in% names(EAW)),
-      all(start <= end),
-      all(diff(start) > 0),
-      all(diff(end) > 0)
-    )
-  )
+  with(udat, stopifnot(all(V2 %in% names(EAW))))
   udat
 }
 # - Read in the Unicode Table --------------------------------------------------
 
 uall <- read.delim(
   stringsAsFactors = FALSE,
-  "UnicodeData.txt",
+  "data/UnicodeData.txt",
   comment.char = "#",
   sep = ";",
   strip.white = TRUE,
@@ -190,6 +216,13 @@ uall <- read.delim(
 )
 uall[['V1']] <- as.hexmode(uall[['V1']])
 
+# - Wide Comments --------------------------------------------------------------
+
+wide_comment <- "
+/* glibc treats the ARIB STD 24 speed limit numbers U+3248-324F and the I Ching
+ * hexagrams U+4DC0-4DFF as wide, so we do too.
+ */
+"
 # - Zero Width Comments --------------------------------------------------------
 
 # Comments that we'll need to update in the final file
@@ -212,17 +245,21 @@ zero_width_comment <-
  *
  *    - SOFT HYPHEN (U+00AD) has a column width of 1.
  *
+ *    - Prepended_Concatenation_Mark have column width of 1.
+ *
  *    - Other format characters (general category code Cf in the Unicode
  *      database) and ZERO WIDTH SPACE (U+200B) have a column width of 0.
  *
  *    - Hangul Jamo medial vowels and final consonants (U+1160-U+11FF)
  *      have a column width of 0.
  *
- *    - Added for our purposes the Unicode control characters
+ *    - C0 and C1 control characters have a column width of 0.
  *
  *    Updated based on the Unicode 12.1.0 tables at
  *    https://www.unicode.org/Public/12.1.0/ucd/UnicodeData.txt
  *    https://www.unicode.org/Public/12.1.0/ucd/EastAsianWidth.txt
+ *
+ *    And reflecting practices in glibc's wcwidth()
  */
  "
 

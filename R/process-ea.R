@@ -16,15 +16,13 @@
 
 # Read the EastAsianWidth.txt table into a data.frame:
 
-source('process-lib.R')
-
-udat <- uni_eaw("EastAsianWidth.txt")
+udat <- uni_eaw("data/EastAsianWidth.txt")
 
 # We should probably collapse ranges that are contiguous and have the
 # same width property as we are not currently using any of the other
 # properties that cause ranges to be split.
 
-ldat <- parse_rlocale('rlocale_data.h')
+ldat <- parse_rlocale('src/rlocale_data.h')
 
 # originally the stuff in ldat was generated in the script and
 # was available to rest of script, hence the list2env horror below as
@@ -94,8 +92,9 @@ map.c[['eaw']] <- udat[map.c[['uid']], 'V2']
 map.c[['W']] <- EAW[map.c[['eaw']]]
 stopifnot(!anyNA(map.c[['EAW']]), !anyNA(map.c[['W']]))
 
-# If no rid, set all to new W value, otherwise update the first element
-# to the new value, and preserve the other locale-specific data
+# If no rid (i.e. didn't exist in prior rlocale_dat), set all to new W value,
+# otherwise update the first element to the new value, and preserve the other
+# locale-specific data
 
 map.c[!rid.val, wcols] <- map.c[!rid.val, 'W']
 map.c[rid.val, 'X1'] <- map.c[rid.val, 'W']
@@ -229,7 +228,8 @@ reps[lbase] <- reps.raw
 
 # Generate the new text
 
-map.fin[map.fin[['rid_raw']] == -1L,'comment'] <- ' // unicode 12'
+# map.fin[map.fin[['rid_raw']] == -1L, 'comment'] <- ' // unicode 12'
+map.fin[map.fin[['rid_raw']] == -1L, 'comment'] <- ''
 map.fin[c('start', 'end')] <- lapply(
   map.fin[c('start', 'end')], as.character, width=0
 )
@@ -276,8 +276,14 @@ txtres <- txtres[order(lnstarts)]
 
 # and into final file
 
-txtfin <- c(raw[seq_len(rlstr)], txtres, raw[-seq_len(rlend)])
-writeLines(txtfin, 'rlocale_data2.h')
+txtfin <- c(
+  raw[seq_len(rlstr - 1L)],
+  wide_comment,
+  raw[rlstr],
+  txtres,
+  raw[-seq_len(rlend)]
+)
+writeLines(txtfin, 'src/rlocale_data.h')
 
 # - Sanity Checks --------------------------------------------------------------
 
@@ -285,7 +291,7 @@ writeLines(txtfin, 'rlocale_data2.h')
 # * No codepoint that was specified in rdat missing
 # * The two ifdef modes are essentially the same
 
-ldat2 <- parse_rlocale('rlocale_data2.h')
+ldat2 <- parse_rlocale('src/rlocale_data.h')
 rdat2 <- ldat2[['rdat']]
 # ifdef TRUE
 rdat2a <- subset(rdat2,

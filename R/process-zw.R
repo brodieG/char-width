@@ -1,8 +1,6 @@
 
 # - Generate 0 Widths ----------------------------------------------------------
 
-source('process-lib.R')
-
 # Zero width code points.
 
 ualls <- subset(
@@ -32,7 +30,7 @@ zlnew <- c(
 #
 # - Generate Text --------------------------------------------------------------
 
-raw <- readLines('rlocale_data2.h')
+raw <- readLines('src/rlocale_data.h')
 l <- length(zlnew)
 lf <- ceiling(l / 3) * 3
 zlfin <- character(lf)
@@ -61,5 +59,5 @@ zfin <- c(
   "",
   raw[(zw_end - 1):length(raw)]
 )
-writeLines(zfin, 'rlocale_data2.h')
+writeLines(zfin, 'src/rlocale_data.h')
 
