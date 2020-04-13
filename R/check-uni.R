@@ -1,3 +1,7 @@
+# - Overview -------------------------------------------------------------------
+
+# Skip to the "Analyze the errors" section
+
 # - Unicode Dat ----------------------------------------------------------------
 
 options(stringsAsFactors=FALSE)
@@ -54,18 +58,6 @@ cps <- c(start, end)
 
 # - Compare --------------------------------------------------------------------
 
-# Compare to other sources:
-#
-# * glibc 2.29                (Unicode 11?)
-# * utf8(1.2.0)::utf8_width   (Unicode 12, but github only)
-# * stri(1.4.6)::stri_width   (Unicode 10 - ICU4C 61.1)
-# * R 3.6.3                   (Unicode 8ish)
-# * R 4.0 r78107 w/ patch     (Unicode 12.1)
-#
-# glibc appears to return -1 when things are undefined, instead of 'Cn' like
-# stringi.  The latter seems more correct.  UTF8 seems to return 6 or 10 for
-# undefined code points, and possibly some others.
-
 cpsa <- cps
 cpsa[0xd800:0xdFFF] <- ""  # surrogates that stringi doesn't like
 
@@ -103,7 +95,8 @@ first <- tapply(i, grpi, '[', 1)
 last <- c(first[-1] - 1, length(i))
 
 # NOTE: the code point ranges are not all inclusive, it represents only the code
-# points that are different in the code point range.
+# points that are different in the code point range, the N column gives you an
+# idea of how many code points in the range are actually represented.
 
 cps <- with(
   ds, paste0(
@@ -122,16 +115,25 @@ res <- as.data.frame(
 
 # - Analyze the errors ---------------------------------------------------------
 
+# Compare to other sources:
+#
+# * glibc 2.29                (Unicode 11)
+# * utf8(1.2.0)::utf8_width   (Unicode 12.0, but github only)
+# * stri(1.4.6)::stri_width   (Unicode 10 - ICU4C 61.1)
+# * R 3.6.3                   (Unicode 8ish)
+# * R 4.0 r78107 w/ patch     (Unicode 12.1)
+#
+# glibc appears to return -1 when things are undefined, instead of 'Cn' like
+# stringi.  The latter seems more correct.  UTF8 seems to return 6 or 10 for
+# undefined code points, and possibly some others.
+
 comp_uni <- function(r4.0, glibc, utf8, stri)
   (r4.0 == glibc | glibc == - 1) &  # glibc -1 for unassigned
   (r4.0 == utf8 | utf8 > 2) &       # utf8 > 2 for unassigned and some others
   r4.0 == stri
 
-# 1 width in R, 0 width in new:
-# * 57 rows
-# * 46 Marks non-spacing (Mn)
-# * 2 Marks Enclosing (Me)
-# * 9 Formatting controls (Cf)
+# 1 width in R, 0 width in new, all are Mn, Me, or Cf in 12.1 so this makes
+# sense.
 
 width_one_to_zero <- subset(res, r3.6 != r4.0 & r3.6 == 1 & r4.0 == 0)
 table(width_one_to_zero[['gc']])
@@ -167,6 +169,10 @@ subset(width_zero_to_greater, !comp_uni(r4.0, glibc, utf8, stri))
 # https://bugs.r-project.org/bugzilla/show_bug.cgi?id=17755
 
 width_greater_to_other <- subset(res, r3.6 != r4.0 & r3.6 > 1)
+
+# Check against glibc, a9bd used to be Mc in UCD 11.0
+
+subset(res, r4.0 != glibc & glibc != -1)
 
 # Make sure we actually looked at all the differences, excluding surrogates
 
