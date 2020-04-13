@@ -21,6 +21,8 @@ These updates do are only partial.  Other things that could/should be done:
 * Compute width on graphemes instead of Unicode code points; this is likely to
   be a bigger change that could possibly leverage ICU on systems that have it,
   but will likely still require updating the width tables.
+* Structure the table data to make future updates easier (this will mean giving
+  up on inline comments, etc).
 * Change the look-up tables to be multi-stage tables for performance as
   recommended by Unicode, particularly as we're increasing the table sizes.
 
@@ -36,9 +38,13 @@ those at all, and only modifies the default locale values.  Entries to other
 locales will be added where they did not exist previously.
 
 We preserve the existing `ifdef` structures for win32, and preserve existing
-comments as much as possible, at least for the widths table.  The zero width
-table is regenerated completely, so inline comments there are lost though those
-seem less important.
+comments as much as possible, at least for the widths table.  This in part means
+that the resulting table is slightly less compact than it could be (we could
+make it more compact but that further complicates already heinously complicated
+logic).
+
+The zero width table is regenerated completely, so inline comments there are
+lost though those seem less important.
 
 ## Checks
 

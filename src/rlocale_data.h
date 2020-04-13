@@ -498,14 +498,9 @@ static const struct interval_wcwidth table_wcwidth[] = {
     {0x3190,0x31ba,{2,2,2,2,2,2,2}},
     {0x31c0,0x31e3,{2,2,2,2,2,2,2}},
     {0x31f0,0x321e,{2,2,2,2,2,2,2}},
-    {0x3220,0x32cf,{2,2,2,2,2,2,2}},
-//    {0x3250,0x327b,{2,2,2,2,2,2,2}},  // overlap with previous
-//    {0x327c,0x32cf,{2,2,2,2,2,2,2}},  // overlap with previous
-    {0x32d0,0x32fe,{2,2,2,2,2,2,2}},
+    {0x3220,0x32fe,{2,2,2,2,2,2,2}},
     {0x32ff,0x32ff,{2,2,2,2,2,2,2}},
-    {0x3300,0x33dd,{2,2,2,2,2,2,2}},
-//    {0x33de,0x3edf,{2,2,2,2,2,2,2}},  // likely typo, see next
-    {0x33de,0x33ff,{2,2,2,2,2,2,2}},
+    {0x3300,0x33ff,{2,2,2,2,2,2,2}},
     {0x3400,0x4db5,{2,2,2,2,2,2,2}}, // CJK Unified Ideographs Externsion A (to 4dbf)
     {0x4db6,0x4dbf,{2,2,2,2,2,2,2}},
     {0x4dc0,0x4dff,{2,2,2,2,2,2,2}},

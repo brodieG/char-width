@@ -180,6 +180,10 @@ map.t <- within(map.t,{
   se <-c(start[-1] - end[-length(end)] == 1, FALSE)
   we <-c(widths[-1] == widths[-length(widths)], FALSE)
   re <-c(diff(rid_raw) == 1L | diff(rid_raw) == 0L, FALSE)
+  # # Alternative produces more compact code but mixes old comment with new
+  # # code points so not 100% ok as comments might not describe new code points
+  # re <-c(diff(rid) == 1L | diff(rid) == 0L, FALSE)
+
   # new comment starts group
   cm <-c(
     (comment[-1] == comment[-length(comment)]) | !nzchar(comment[-1]),

@@ -3,7 +3,7 @@
 options(stringsAsFactors=FALSE)
 uall <- read.delim(
   stringsAsFactors = FALSE,
-  "UnicodeData.txt",
+  "data/UnicodeData.txt",
   comment.char = "#",
   sep = ";",
   strip.white = TRUE,
@@ -13,13 +13,14 @@ uall[['V1']] <- as.hexmode(uall[['V1']])
 
 # - EAW ------------------------------------------------------------------------
 
-source('process-lib.R')
-udat <- uni_eaw("EastAsianWidth.txt")
+source('R/process-lib.R')
+udat <- uni_eaw("data/EastAsianWidth.txt")
 uallp <- all_points(udat, 'u')
 
 # - Code Points ----------------------------------------------------------------
 
-# Generate every code point from 0x1 to 0x10fffd
+# Generate every code point from 0x1 to 0x10fffd; 0x0 causes problems so we skip
+# it
 
 start <- as.character(
   parse(
@@ -68,15 +69,15 @@ cps <- c(start, end)
 cpsa <- cps
 cpsa[0xd800:0xdFFF] <- ""  # surrogates that stringi doesn't like
 
-glibc <- readLines('glibc_widths')
+glibc <- readLines('data/glibc_widths')
 utf8 <- utf8::utf8_width(cps)
 stri <- stringi::stri_width(cpsa)
 r3.6 <- nchar(cps, type='width')
-r4.0 <- readRDS('r40widths.rds')
+r4.0 <- readRDS('data/r40widths.rds')
 r4.0[is.na(r4.0)] <- -1L
 
 # r4.0 <- nchar(cps, type='width', allowNA=TRUE)
-# saveRDS(r4.0, 'saveRDS(r4.0')
+# saveRDS(r4.0, 'r40widths.rds')
 
 dat <- data.frame(
   cp=1:0x10fffd,
@@ -142,25 +143,28 @@ nrow(subset(width_one_to_zero, comp_uni(r4.0, glibc, utf8, stri)))
 # Of the remainder, we spot checked for stri UCD10.0, and found that
 # many of the Mn are just missing, i.e. Cn, so it makes sense stri returns them
 # as width 1.
+#
+# For glibc for a9bd, that used to be 'Mc' in UCD 11.0
 
 subset(width_one_to_zero, !comp_uni(r4.0, glibc, utf8, stri))
-
-
 subset(width_one_to_zero, !(r4.0 == glibc) & glibc == 1)
 subset(dat, glibc == 1 & gc == 'Cf')
 
-# These seem okay if we ignore all the unassigned planes.  U+32FF was not
-# defined in earlier versions
+# These seem okay if we ignore all the unassigned planes.  U+32FF was added in
+# 12.1.0, so even `utf8` which is 12.0 is missing it.
 
 width_one_to_greater <- subset(res, r3.6 != r4.0 & r4.0 > 1)
 subset(width_one_to_greater, !comp_uni(r4.0, glibc, utf8, stri))
 
-# Almost everyone agrees that these should not be zero width, a bit of a mystery
-# why they were considered such by R.  Some of them are Mc in the vicinity of Mn
+# Almost everyone agrees that the Mc in these should not be zero width, a bit of
+# a mystery why they were considered such by R.  Some of them are Mc in the
+# vicinity of Mn, but even in Unicode 8 they were not Mc
 
 width_zero_to_greater <- subset(res, r3.6 != r4.0 & r3.6 == 0)
 subset(width_zero_to_greater, !comp_uni(r4.0, glibc, utf8, stri))
 
+# This the surrogate but addressed by 17755
+# https://bugs.r-project.org/bugzilla/show_bug.cgi?id=17755
 
 width_greater_to_other <- subset(res, r3.6 != r4.0 & r3.6 > 1)
 
