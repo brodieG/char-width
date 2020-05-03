@@ -65,15 +65,15 @@ glibc <- readLines('data/glibc_widths')
 utf8 <- utf8::utf8_width(cps)
 stri <- stringi::stri_width(cpsa)
 r3.6 <- nchar(cps, type='width')
-r4.0 <- readRDS('data/r40widths.rds')
-r4.0[is.na(r4.0)] <- -1L
+r4.1 <- readRDS('data/r41widths.rds')
+r4.1[is.na(r4.1)] <- -1L
 
-# r4.0 <- nchar(cps, type='width', allowNA=TRUE)
-# saveRDS(r4.0, 'r40widths.rds')
+# r4.1 <- nchar(cps, type='width', allowNA=TRUE)
+# saveRDS(r4.1, 'r40widths.rds')
 
 dat <- data.frame(
   cp=1:0x10fffd,
-  r3.6, r4.0, glibc, utf8, stri
+  r3.6, r4.1, glibc, utf8, stri
 )
 dat[['cp']] <- as.hexmode(dat[['cp']])
 map <- match(dat[['cp']], uall[['V1']])
@@ -82,13 +82,13 @@ dat <- transform(
   eaw=udat[uallp[['uid']][match(cp, uallp[['id']])], 'V2'],
   desc=uall[['V2']][map]
 )
-ds <- subset(dat, r3.6 != r4.0)
+ds <- subset(dat, r3.6 != r4.1)
 ds <- transform(
   ds,
   gc=ifelse(is.na(gc), '??', gc),
   eaw=ifelse(is.na(eaw), '??', eaw)
 )
-grp <- as.integer(with(ds, interaction(r3.6, r4.0, glibc, utf8, stri, gc)))
+grp <- as.integer(with(ds, interaction(r3.6, r4.1, glibc, utf8, stri, gc)))
 grpi <- with(rle(grp), rep(seq_along(values), lengths))
 i <- seq_along(grpi)
 first <- tapply(i, grpi, '[', 1)
@@ -127,20 +127,20 @@ res <- as.data.frame(
 # stringi.  The latter seems more correct.  UTF8 seems to return 6 or 10 for
 # undefined code points, and possibly some others.
 
-comp_uni <- function(r4.0, glibc, utf8, stri)
-  (r4.0 == glibc | glibc == - 1) &  # glibc -1 for unassigned
-  (r4.0 == utf8 | utf8 > 2) &       # utf8 > 2 for unassigned and some others
-  r4.0 == stri
+comp_uni <- function(r4.1, glibc, utf8, stri)
+  (r4.1 == glibc | glibc == - 1) &  # glibc -1 for unassigned
+  (r4.1 == utf8 | utf8 > 2) &       # utf8 > 2 for unassigned and some others
+  r4.1 == stri
 
 # 1 width in R, 0 width in new, all are Mn, Me, or Cf in 12.1 so this makes
 # sense.
 
-width_one_to_zero <- subset(res, r3.6 != r4.0 & r3.6 == 1 & r4.0 == 0)
+width_one_to_zero <- subset(res, r3.6 != r4.1 & r3.6 == 1 & r4.1 == 0)
 table(width_one_to_zero[['gc']])
 
-# Of these 57, 36 have glib, utf8, and stri agree with the patch:
+# Of these 51, 34 have glib, utf8, and stri agree with the patch:
 
-nrow(subset(width_one_to_zero, comp_uni(r4.0, glibc, utf8, stri)))
+nrow(subset(width_one_to_zero, comp_uni(r4.1, glibc, utf8, stri)))
 
 # Of the remainder, we spot checked for stri UCD10.0, and found that
 # many of the Mn are just missing, i.e. Cn, so it makes sense stri returns them
@@ -148,31 +148,36 @@ nrow(subset(width_one_to_zero, comp_uni(r4.0, glibc, utf8, stri)))
 #
 # For glibc for a9bd, that used to be 'Mc' in UCD 11.0
 
-subset(width_one_to_zero, !comp_uni(r4.0, glibc, utf8, stri))
-subset(width_one_to_zero, !(r4.0 == glibc) & glibc == 1)
-subset(dat, glibc == 1 & gc == 'Cf')
+subset(width_one_to_zero, !comp_uni(r4.1, glibc, utf8, stri))
+subset(width_one_to_zero, !(r4.1 == glibc) & glibc == 1)
 
-# These seem okay if we ignore all the unassigned planes.  U+32FF was added in
-# 12.1.0, so even `utf8` which is 12.0 is missing it.
+# These seem okay if we ignore all the unassigned code points that by definition
+# should be given a width as per EAW, but glibc just leaves at -1.  `stri` just
+# default the to 1. U+32FF was added in 12.1.0, so even `utf8` which is 12.0 is
+# missing it.
 
-width_one_to_greater <- subset(res, r3.6 != r4.0 & r4.0 > 1)
-subset(width_one_to_greater, !comp_uni(r4.0, glibc, utf8, stri))
+width_one_to_greater <- subset(res, r3.6 != r4.1 & r4.1 > 1)
+subset(width_one_to_greater, !comp_uni(r4.1, glibc, utf8, stri))
 
-# Almost everyone agrees that the Mc in these should not be zero width, a bit of
-# a mystery why they were considered such by R.  Some of them are Mc in the
-# vicinity of Mn, but even in Unicode 8 they were not Mc
+# Almost everyone agrees that the Mcs that r3.6 considers zero width should not
+# be.  A bit of a mystery why they were considered such by R.  Some of them are
+# Mc in the vicinity of Mn, but even in Unicode 8 they were not Mc
 
-width_zero_to_greater <- subset(res, r3.6 != r4.0 & r3.6 == 0)
-subset(width_zero_to_greater, !comp_uni(r4.0, glibc, utf8, stri))
+width_zero_to_greater <- subset(res, r3.6 != r4.1 & r3.6 == 0)
 
-# This the surrogate but addressed by 17755
+# The ones that are a little controversial are the ones with special treatment
+# by glibc, which we copied.
+
+subset(width_zero_to_greater, !comp_uni(r4.1, glibc, utf8, stri))
+
+# This the surrogate bug addressed by 17755
 # https://bugs.r-project.org/bugzilla/show_bug.cgi?id=17755
 
-width_greater_to_other <- subset(res, r3.6 != r4.0 & r3.6 > 1)
+width_greater_to_other <- subset(res, r3.6 != r4.1 & r3.6 > 1)
 
 # Check against glibc, a9bd used to be Mc in UCD 11.0
 
-subset(res, r4.0 != glibc & glibc != -1)
+subset(res, r4.1 != glibc & glibc != -1)
 
 # Make sure we actually looked at all the differences, excluding surrogates
 
@@ -190,7 +195,7 @@ stopifnot(
   identical(
     sort(
       subset(
-        res, r3.6 != r4.0 & cps < 'd800..d800' | cps > 'dfff..dfff'
+        res, r3.6 != r4.1 & cps < 'd800..d800' | cps > 'dfff..dfff'
       )[['cps']]
     ),
     checked

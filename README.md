@@ -4,23 +4,23 @@
 
 This repository is a collection of scripts, data, and documentation used to
 update the tables in 'src/main/rlocale_data.h' from the c.a. 2015 Unicode 8
-tables to more recent versions (12.1 under the current proposal).
+tables to more recent versions (12.1 under the current proposal).  The
+Unicode EastAsianWidth property that is often used to determine terminal cursor
+advance of characters has changed significantly since Unicode 8, particularly
+for emoji.
 
-These tables are used by `R_nchar` (itself used by `base::nchar`), and via
-`R_i18n_wcwidth|R_i18n_wcswidth` in character.c, errors.c, printUtils.c,
-../gnuwin32/console.c ../gnuwin32/getline/getline.c,
-grDevices/src/{devPS,devPicTex.c}.
+The rlocale_data tables are used by `R_nchar` (itself used by `base::nchar`),
+and via `R_i18n_wcwidth|R_i18n_wcswidth` in "character.c", "errors.c",
+"printUtils.c", "../gnuwin32/console.c" "../gnuwin32/getline/getline.c",
+"grDevices/src/{devPS,devPicTex.c}".
 
-In order to replicate the results discussed here we also need to apply the patch
-proposed in [17755][15], otherwise there will be differences in results when
-for code points reserved for UTF-16 surrogates.
-
-These updates do are only partial.  Other things that could/should be done:
+These updates are only partial.  Other things that could/should be done:
 
 * Update the other tables in 'rlocale_data.h'.
 * Compute width on graphemes instead of Unicode code points; this is likely to
   be a bigger change that could possibly leverage ICU on systems that have it,
-  but will likely still require updating the width tables.
+  but will likely still require updating the width tables.  This is necessary to
+  correctly compute advance width of e.g. combining emoji.
 * Structure the table data to make future updates easier (this will mean giving
   up on inline comments, etc).
 * Change the look-up tables to be multi-stage tables for performance as
@@ -28,7 +28,7 @@ These updates do are only partial.  Other things that could/should be done:
 
 ## rlocale_data.h Update
 
-In order to update Rlocale, we must first apply a minor patch
+In order to update Rlocale, we must first apply a patch
 (`patches/patch-rloc-dat-init.txt`) to fix some minor bugs in the existing
 tables, and then run `R/update-r-loc-dat.R`.
 
@@ -52,12 +52,12 @@ We compare `nchar(..., type='width')` for every Unicode code starting at U+0001
 with the following programs:
 
 * glibc 2.29                (Unicode 11)
-* utf8(1.2.0)::utf8_width   (Unicode 12, but github only)
+* utf8(1.2.0)::utf8_width   (Unicode 12.0, but github only)
 * stri(1.4.6)::stri_width   (Unicode 10 - ICU4C 61.1)
 * R 3.6.3                   (Unicode 8)
-* R 4.0 r78116 w/ patch     (Unicode 12.1)
+* R-devel 78347 w/ patch    (Unicode 12.1)
 
-See `check_widths.R` for details.
+See [`R/check_uni.R`][16] for details.
 
 ## Width Assumptions
 
@@ -97,7 +97,7 @@ the [glibc repo][14].
 #### Glibc
 
 Comments in the sources as well as some of the reported width values in the
-pre-patch version strongly suggest `glibc` was used to generate or valid the
+pre-patch version strongly suggest `glibc` was used to generate or validate the
 original tables, for this reason we make the same non-standard assumptions that
 `glibc` makes, even though this may be controversial in some cases.
 
@@ -108,7 +108,7 @@ width 0.  Whether this should be the case or not is controversial, but Jukka
 Korpela provides a [compelling argument][11] for why they should be width 1,
 particularly in the context of terminal emulators.
 
-#### Perpending Marks
+#### Prepending Marks
 
 A subset of the General Category 'Cf' code points are
 'Prepended_Concatenation_Mark' (PCM).  `glibc` and we treat these as width 1,
@@ -116,8 +116,8 @@ although this is questionable.  PCMs are also known as subtending marks because
 they are used in e.g. Arabic scripts to extend under subsequent characters,
 although in some cases they extend above.  In many ways these behave like
 enclosing marks, except that because they enclose a possibly varying number of
-subsequent characters (instead of a single preceding base character) they end up
-in the 'Cf' category.
+**subsequent** characters (instead of a single **preceding** base character)
+they end up in the 'Cf' category.
 
 Some of the PCMs should be treated as non-spacing or enclosing marks.  For
 example U+0605 is a supralinear mark over the subsequent numbers and [shouldn't
@@ -159,8 +159,7 @@ rendered wide that are considered narrow by glibc (e.g. U+1F12F:1f169).
 Should we really single out those 8 for special treatment?
 
 Someone else also thinks this is a [bug][12].  And lots of controversy in a
-[bug-report discussion][13].  Unicode site is down so I can't check the original
-unicode question.
+[bug-report discussion][13].
 
 [1]: http://unicode.org/L2/L2002/02368-default-ignorable.html
 [2]: http://std.dkuug.dk/jtc1/sc2/wg2/docs/N3843.pdf
@@ -177,4 +176,5 @@ unicode question.
 [13]: https://sourceware.org/bugzilla/show_bug.cgi?id=21750
 [14]: https://www.gnu.org/software/libc/sources.html
 [15]: https://bugs.r-project.org/bugzilla/show_bug.cgi?id=17755
+[16]: https://github.com/brodieG/char-width/blob/master/R/check-uni.R
 

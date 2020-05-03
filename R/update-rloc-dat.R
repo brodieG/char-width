@@ -7,7 +7,7 @@
 if(
   inherits(
     file.copy(
-      'src/rlocale_data-r78116.h', 'src/rlocale_data.h', overwrite=TRUE
+      'src/rlocale_data-r78347.h', 'src/rlocale_data.h', overwrite=TRUE
     ),
     "try-error"
   )

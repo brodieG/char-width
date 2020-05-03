@@ -6,12 +6,13 @@ emoji as wide (i.e. two column) characters.  Over the last couple of years many
 (most?) terminal emulators have also updated their width tables, so it may make
 sense to update R's computations as well.
 
-Attached is a patch that updates the width tables in 'src/main/rlocale_data.h'
-to Unicode 12.1.  I wrote an R script to do the updates programmatically, so it
-should be straightforward to update to different versions[3].
+Attached is a patch that updates the **width** tables in
+'src/main/rlocale_data.h' to Unicode 12.1.  I wrote an R script to do the
+updates programmatically, so it should be straightforward to update to different
+versions[3].
 
-To test I did this correctly I compared[4] the width computations for every Unicode
-code starting at U+0001 with the following programs:
+To test I did this correctly I compared[4] the width computations for every
+Unicode code starting at U+0001 with the following programs:
 
 * glibc 2.29                (Unicode 11)
 * utf8(1.2.0)::utf8_width   (Unicode 12.0, but github only)
@@ -19,10 +20,12 @@ code starting at U+0001 with the following programs:
 * R 3.6.3                   (Unicode 8)
 * R 4.0 r78116 w/ patch     (Unicode 12.1)
 
-All tests were carried out after applying the separate patch proposed in
-17755[1].  I did not update any of the locale-specific values (i.e. those not in
+I did not update any of the locale-specific values (i.e. those not in
 the first column), and attempted to preserve existing comments and file
-structure as much as possible.
+structure as much as possible.  I did not test the non-default locales, and I
+did not test on win32; however, none of the entries affected by the patch were
+interesting in regards to those two factors (i.e. different locale values,
+actual win32 entries).
 
 `glibc` takes a unique position on prepending marks (e.g. U+0600-U+0605), the
 circled number "ideograms" from ARIB STD 24 (U+3248-324F), and the I Ching
@@ -48,8 +51,8 @@ across several platforms.
 
 [1]: https://bugs.r-project.org/bugzilla/show_bug.cgi?id=17755
 [2]: https://sourceware.org/bugzilla/show_bug.cgi?id=21750
-[3]: https://github.com/brodieG/char-width/tree/v0.1.0/R/update-rloc-dat.R
-[4]: https://github.com/brodieG/char-width/tree/v0.1.0/R/check-uni.R
-[5]: https://github.com/brodieG/char-width/tree/v0.1.0
+[3]: https://github.com/brodieG/char-width/tree/v0.2.0/R/update-rloc-dat.R
+[4]: https://github.com/brodieG/char-width/tree/v0.2.0/R/check-uni.R
+[5]: https://github.com/brodieG/char-width/tree/v0.2.0
 
 

@@ -1,6 +1,6 @@
 Index: src/main/rlocale_data.h
 ===================================================================
---- src/main/rlocale_data.h	(revision 78116)
+--- src/main/rlocale_data.h	(revision 78347)
 +++ src/main/rlocale_data.h	(working copy)
 @@ -38,6 +38,11 @@
  */
